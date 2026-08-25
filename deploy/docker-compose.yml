@@ -1,3 +1,8 @@
+# Compose defaults a project name to this directory's basename, which
+# would collide with any other project that also names its compose
+# directory `deploy` on the same host.
+name: train-tracker-query-web
+
 services:
   service:
     build:
