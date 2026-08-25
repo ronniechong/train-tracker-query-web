@@ -1,7 +1,10 @@
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 
 from .pipeline.models import QueryResponse
 from .pipeline.orchestrator import run_pipeline
+
+load_dotenv()
 
 MAX_AUDIO_BYTES = 5 * 1024 * 1024
 
@@ -25,6 +28,6 @@ async def query(request: Request) -> QueryResponse:
     audio_bytes = b"".join(chunks)
 
     try:
-        return run_pipeline(audio_bytes)
+        return await run_pipeline(audio_bytes)
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc

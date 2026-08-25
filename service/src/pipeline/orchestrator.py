@@ -2,8 +2,8 @@ from . import compose, gate1, gate2, next_service, stt, tts
 from .models import QueryResponse
 
 
-def run_pipeline(audio_bytes: bytes) -> QueryResponse:
-    transcript = stt.transcribe(audio_bytes)
+async def run_pipeline(audio_bytes: bytes) -> QueryResponse:
+    transcript = await stt.transcribe(audio_bytes)
 
     if not gate1.is_in_scope(transcript):
         return QueryResponse(
