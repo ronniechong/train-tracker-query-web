@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 
 class FallbackReason(StrEnum):
+    OFF_TOPIC = "off_topic"
     OUT_OF_SCOPE = "out_of_scope"
     AMBIGUOUS_STATION = "ambiguous_station"
     LOW_CONFIDENCE_STATION = "low_confidence_station"

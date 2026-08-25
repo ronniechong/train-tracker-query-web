@@ -13,7 +13,7 @@ def test_query_rejects_audio_over_5mb():
     assert response.status_code == 413
 
 
-def test_query_returns_not_implemented_for_unbuilt_gate1():
+def test_query_returns_not_implemented_for_unbuilt_gate2():
     with patch(
         "src.pipeline.orchestrator.stt.transcribe",
         new=AsyncMock(return_value="when's the next train from Richmond"),

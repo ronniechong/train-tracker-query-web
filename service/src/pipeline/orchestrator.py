@@ -1,14 +1,19 @@
-from . import compose, gate1, gate2, next_service, stt, tts
-from .models import QueryResponse
+from . import compose, declines, gate1, gate2, next_service, stt, tts
+from .gate1 import Gate1Outcome
+from .models import FallbackReason, QueryResponse
 
 
 async def run_pipeline(audio_bytes: bytes) -> QueryResponse:
     transcript = await stt.transcribe(audio_bytes)
+    return await run_pipeline_for_transcript(transcript)
 
-    if not gate1.is_in_scope(transcript):
+
+async def run_pipeline_for_transcript(transcript: str) -> QueryResponse:
+    gate1_outcome = await gate1.check(transcript)
+    if gate1_outcome is not Gate1Outcome.PASS:
         return QueryResponse(
-            text="I can only help with Melbourne metro train times.",
-            fallback_reason="out_of_scope",
+            text=declines.random_decline(),
+            fallback_reason=FallbackReason.OFF_TOPIC,
         )
 
     extracted = gate2.extract(transcript)
