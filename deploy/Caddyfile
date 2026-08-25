@@ -1,0 +1,40 @@
+# Sole ingress into this project's `service` (API) and `web` (static
+# frontend) containers. Listens on plain HTTP on an internal-only network —
+# TLS termination happens on the reverse-ingress layer in front of this
+# container, not here.
+{
+	auto_https off
+	admin off
+
+	# The `tailscale` sidecar shares this container's network namespace
+	# (compose's `network_mode: service:caddy`), so every real Funnel
+	# request arrives over loopback with X-Forwarded-For already set
+	# correctly by tailscaled. Trusting 127.0.0.1 here is safe because
+	# nothing but the sidecar can reach Caddy on loopback.
+	servers {
+		trusted_proxies static 127.0.0.1
+	}
+}
+
+:8080 {
+	encode gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'self'"
+		Permissions-Policy "geolocation=(), camera=(), microphone=(self), payment=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	@api path /api/* /health
+	handle @api {
+		reverse_proxy service:8000
+	}
+
+	handle {
+		reverse_proxy web:80
+	}
+}

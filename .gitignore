@@ -1,8 +1,7 @@
 # --- secrets & local-only context (never commit) ---
 .env
 .env.*
-!web/.env.example
-!service/.env.example
+!deploy/.env.example
 CLAUDE.local.md
 docker-compose.override.yml
 

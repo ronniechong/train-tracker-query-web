@@ -1,0 +1,85 @@
+services:
+  service:
+    build:
+      context: ../service
+    image: train-tracker-query-web-service:local
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    # No egress needed yet — this skeleton has no outbound calls (no
+    # train-tracker API calls, no AI provider calls until a later
+    # milestone). Internal-only network, no published ports.
+    networks:
+      - ingress
+
+  web:
+    build:
+      context: ../web
+    image: train-tracker-query-web-web:local
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    networks:
+      - ingress
+
+  caddy:
+    image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
+    restart: unless-stopped
+    read_only: true
+    user: "1000:1000"
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - ingress
+      - public
+    depends_on:
+      - service
+      - web
+
+  # Shares Caddy's network namespace so it reaches Caddy over localhost and
+  # never gains any network membership beyond exactly what Caddy already
+  # has. Same pattern as train-tracker's own M3 setup.
+  tailscale:
+    image: tailscale/tailscale:latest@sha256:cdf5612ded5be1344f1a704b8c5e53496db97376bb533e5e15f141e48bf60cc0
+    restart: unless-stopped
+    network_mode: service:caddy
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+      - ./tailscale-entrypoint.sh:/entrypoint.sh:ro
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?TS_AUTHKEY must be set in deploy/.env}
+      TS_HOSTNAME: ${TS_HOSTNAME:-train-tracker-query-web}
+      TARGET_PORT: "8080"
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    depends_on:
+      - caddy
+
+networks:
+  # No real outbound route among this project's own networks — `service`
+  # and `web` only ever accept inbound from `caddy`, never initiate
+  # anything themselves at this stage.
+  ingress:
+    internal: true
+  # The only network with a real outbound route — exists for the
+  # `tailscale` sidecar's own traffic, inherited via `network_mode` on the
+  # `caddy` service it shares a namespace with.
+  public:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  tailscale_state:
