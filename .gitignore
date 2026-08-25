@@ -1,0 +1,27 @@
+# --- secrets & local-only context (never commit) ---
+.env
+.env.*
+!web/.env.example
+!service/.env.example
+CLAUDE.local.md
+docker-compose.override.yml
+
+# --- data (stays out of the public repo) ---
+/deploy/data/
+*.db
+*.db-*
+
+# --- python ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# --- node ---
+node_modules/
+web/dist/
+coverage/
+
+# --- misc ---
+.DS_Store

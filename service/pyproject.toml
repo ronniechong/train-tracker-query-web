@@ -1,0 +1,25 @@
+[project]
+name = "train-tracker-query-web"
+version = "0.1.0"
+description = "Voice-query service for Melbourne metro train info"
+readme = "README.md"
+authors = [
+    { name = "Ronnie Chong", email = "ronniechong@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "httpx>=0.28.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

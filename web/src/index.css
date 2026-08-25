@@ -1,0 +1,13 @@
+/* Placeholder — the real design system lands from a separate claude-design session. */
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}
