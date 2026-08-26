@@ -47,7 +47,7 @@ async def _run_pipeline_for_extracted(extracted: ExtractedQuery) -> QueryRespons
         )
 
     try:
-        result = await next_service.find_next_service(stations)
+        result = await next_service.find_next_service(stations, requested_time=extracted.time)
     except UnknownStation as exc:
         return QueryResponse(text=str(exc), fallback_reason=FallbackReason.UNKNOWN_STATION)
 

@@ -79,7 +79,9 @@ _EXTRACTION_SYSTEM_PROMPT = (
     "route name if one is explicitly mentioned, and an optional time if "
     "one is explicitly mentioned, from a transcript of a spoken train-"
     "schedule question. Use null for anything not stated. Do not guess or "
-    "normalize station names beyond what was said."
+    "normalize station names beyond what was said. If a time is stated, "
+    "normalize it to 24-hour HH:MM format (e.g. '5:30pm' -> '17:30'); "
+    "assume today's date, never guess a date."
 )
 
 _EXTRACTION_SCHEMA = {

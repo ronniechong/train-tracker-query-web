@@ -1,10 +1,14 @@
 import os
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import httpx
 from pydantic import BaseModel
 
 from .gate2 import ResolvedStations
 from .stations_cache import ScheduleUnavailable
+
+_MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
 
 
 class StationRef(BaseModel):
@@ -40,12 +44,31 @@ def _base_url() -> str:
     return os.environ["TRAIN_TRACKER_API_BASE_URL"].rstrip("/")
 
 
-async def find_next_service(stations: ResolvedStations) -> NextServiceResult:
+def _after_param(requested_time: str | None) -> str | None:
+    """Converts a Gate 2-normalized "HH:MM" (assumed today, Melbourne
+    local — see gate2's extraction prompt) into the UTC instant
+    train-tracker's `after` param expects. Malformed input is ignored
+    (falls back to "now") rather than failing the whole query over a
+    time the user may not even have cared about getting exactly right."""
+    if requested_time is None:
+        return None
+    try:
+        hour, minute = (int(part) for part in requested_time.split(":", 1))
+    except ValueError:
+        return None
+    today = datetime.now(_MELBOURNE_TZ).date()
+    local_dt = datetime(today.year, today.month, today.day, hour, minute, tzinfo=_MELBOURNE_TZ)
+    return local_dt.astimezone(timezone.utc).isoformat()
+
+
+async def find_next_service(stations: ResolvedStations, requested_time: str | None = None) -> NextServiceResult:
+    params = {"from": stations.from_station_name, "to": stations.to_station_name}
+    after = _after_param(requested_time)
+    if after is not None:
+        params["after"] = after
+
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"{_base_url()}/api/next-service",
-            params={"from": stations.from_station_name, "to": stations.to_station_name},
-        )
+        response = await client.get(f"{_base_url()}/api/next-service", params=params)
 
     if response.status_code == 404:
         detail = response.json()["detail"]
