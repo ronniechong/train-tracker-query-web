@@ -1,0 +1,134 @@
+[
+  {
+    "spoken": "Richmond",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["Richmond Railway Station"],
+    "note": "SEEDED REGRESSION 1 (Session 15, commit 117a4e3): bare 'Richmond' is a word-subset of North/East/West Richmond too, but must resolve to the exact match directly, never re-enter ambiguous clarification."
+  },
+  {
+    "spoken": "North",
+    "expected_outcome": "no_match_fallback",
+    "expected_station_names": [],
+    "note": "SEEDED REGRESSION 2 (Session 15 cont., commit 91cc060): a bare cardinal direction alone must resolve to zero candidates, never falsely match every 'North '-prefixed station."
+  },
+  {
+    "spoken": "South",
+    "expected_outcome": "no_match_fallback",
+    "expected_station_names": [],
+    "note": "Same regression as above, opposite direction word — verifies the fix isn't North-specific."
+  },
+  {
+    "spoken": "East",
+    "expected_outcome": "no_match_fallback",
+    "expected_station_names": [],
+    "note": "Same regression, third direction word."
+  },
+  {
+    "spoken": "West",
+    "expected_outcome": "no_match_fallback",
+    "expected_station_names": [],
+    "note": "Same regression, fourth direction word."
+  },
+  {
+    "spoken": "North Richmond",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["North Richmond Railway Station"],
+    "note": "Compound name using a direction word must still resolve correctly — verifies the bare-direction fix didn't collateral-damage real compound names."
+  },
+  {
+    "spoken": "East Richmond",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["East Richmond Railway Station"],
+    "note": "Same check, different direction prefix."
+  },
+  {
+    "spoken": "West Richmond",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["West Richmond Railway Station"],
+    "note": "Same check, third direction prefix."
+  },
+  {
+    "spoken": "Melbourne",
+    "expected_outcome": "ambiguous_options",
+    "expected_station_names": ["Melbourne Central Railway Station", "North Melbourne Railway Station"],
+    "note": "Live-verified genuine ambiguity: no station is literally named just 'Melbourne', so no exact match wins outright — both real candidates should be offered as clickable options."
+  },
+  {
+    "spoken": "Yarra",
+    "expected_outcome": "ambiguous_options",
+    "expected_station_names": ["South Yarra Railway Station", "Yarraman Railway Station"],
+    "note": "Live-verified fuzzy-score collision (not a word-subset case) between two unrelated real stations."
+  },
+  {
+    "spoken": "Hill",
+    "expected_outcome": "ambiguous_options",
+    "expected_station_names": ["Box Hill Railway Station", "Clifton Hill Railway Station"],
+    "note": "Live-verified word-subset collision."
+  },
+  {
+    "spoken": "Park",
+    "expected_outcome": "ambiguous_options",
+    "expected_station_names": ["Keon Park Railway Station", "Merinda Park Railway Station", "Noble Park Railway Station", "Oak Park Railway Station", "Roxburgh Park Railway Station", "Royal Park Railway Station", "Sandown Park Railway Station", "Victoria Park Railway Station"],
+    "note": "Live-verified: a bare generic suffix word real-world users might actually say alone, matches 8 real candidates."
+  },
+  {
+    "spoken": "Rich Mind",
+    "expected_outcome": "no_match_fallback",
+    "expected_station_names": [],
+    "note": "Live-verified: 'Rich Mind' scores below the fuzzy threshold against 'Richmond', so falls through to the LLM-suggestion step rather than a direct fuzzy match — must not silently answer for the wrong station."
+  },
+  {
+    "spoken": "Mooroolbark",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["Mooroolbark Railway Station"],
+    "note": "Correct exact spelling resolves directly."
+  },
+  {
+    "spoken": "Morrowbark",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["Mooroolbark Railway Station"],
+    "note": "Live-verified real STT mishear (documented in gate2.py's threshold comment) that must still resolve, not fall back."
+  },
+  {
+    "spoken": "Flinder Street",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["Flinders Street Railway Station"],
+    "note": "Minor mishear of a high-traffic station name must resolve confidently."
+  },
+  {
+    "spoken": "Boxhill",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["Box Hill Railway Station"],
+    "note": "Two words run together by STT must still resolve."
+  },
+  {
+    "spoken": "Sutherin Cross",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["Southern Cross Railway Station"],
+    "note": "Live-verified mishear of a major interchange name resolves correctly."
+  },
+  {
+    "spoken": "Coalfield",
+    "expected_outcome": "confident_match",
+    "expected_station_names": ["Caulfield Railway Station"],
+    "note": "Live-verified single-syllable-swap mishear resolves correctly."
+  },
+  {
+    "spoken": "Denanong",
+    "expected_outcome": "no_match_fallback",
+    "expected_station_names": [],
+    "note": "Live-verified: this particular mishear of 'Dandenong' scores below threshold — falls to LLM-suggestion path, must not guess."
+  },
+  {
+    "spoken": "Foots Cray",
+    "expected_outcome": "no_match_fallback",
+    "expected_station_names": [],
+    "note": "Live-verified: split-word mishear of 'Footscray' scores below threshold — falls to LLM-suggestion path."
+  },
+  {
+    "spoken": "Where Ribbey",
+    "expected_outcome": "no_match_fallback",
+    "expected_station_names": [],
+    "note": "Live-verified: severe mishear of 'Werribee' scores below threshold — falls to LLM-suggestion path, the case class this project's cost/latency tradeoff (top-K LLM suggestion) exists for."
+  }
+]

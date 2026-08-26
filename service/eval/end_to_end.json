@@ -1,0 +1,98 @@
+[
+  {
+    "transcript": "When's the next train from Richmond to Flinders Street",
+    "expected_category": "success",
+    "expected_fields": {"from_station": "Richmond", "to_station": "Flinders Street", "route_hint": null, "time": null},
+    "note": "Same-line, unambiguous, no transfer required."
+  },
+  {
+    "transcript": "Next train from Camberwell to Southern Cross on the Belgrave line",
+    "expected_category": "success",
+    "expected_fields": {"from_station": "Camberwell", "to_station": "Southern Cross", "route_hint": "Belgrave", "time": null},
+    "note": "Same-line with an explicit route hint."
+  },
+  {
+    "transcript": "Get me from Mooroolbark to Flinders Street",
+    "expected_category": "success",
+    "expected_fields": {"from_station": "Mooroolbark", "to_station": "Flinders Street", "route_hint": null, "time": null},
+    "note": "Same-line (Belgrave/Lilydale group), tests a longer real station name end to end."
+  },
+  {
+    "transcript": "Next train from Werribee to North Melbourne",
+    "expected_category": "success",
+    "expected_fields": {"from_station": "Werribee", "to_station": "North Melbourne", "route_hint": null, "time": null},
+    "note": "Same-line, ends at a curated interchange station (still within one line, not a transfer)."
+  },
+  {
+    "transcript": "How do I get from Werribee to Frankston",
+    "expected_category": "success",
+    "expected_fields": {"from_station": "Werribee", "to_station": "Frankston", "route_hint": null, "time": null},
+    "note": "Live-verified (2 legs) via a Flinders Street transfer, not a fallback — corrected during Day 1 curation: the original assumption this had no single-transfer path was wrong; checked directly against find_next_service before being added here, not asserted from network-topology memory."
+  },
+  {
+    "transcript": "Next train from Glen Waverley to Frankston",
+    "expected_category": "success",
+    "expected_fields": {"from_station": "Glen Waverley", "to_station": "Frankston", "route_hint": null, "time": null},
+    "note": "Live-verified (2 legs) via a Flinders Street transfer — corrected during Day 1 curation: originally drafted as 'via a change at Richmond', which was wrong; checked directly against find_next_service."
+  },
+  {
+    "transcript": "What's the capital of France",
+    "expected_category": "fallback",
+    "expected_fields": null,
+    "note": "Out-of-scope, expects Gate 1 off_topic decline, never reaches Gate 2."
+  },
+  {
+    "transcript": "Tell me a joke",
+    "expected_category": "fallback",
+    "expected_fields": null,
+    "note": "Out-of-scope, same as above with different phrasing."
+  },
+  {
+    "transcript": "What's the next train from Melbourne to Richmond",
+    "expected_category": "clarification",
+    "expected_fields": {"from_station": "Melbourne", "to_station": "Richmond", "route_hint": null, "time": null},
+    "note": "Live-verified ambiguous 'from' station (Melbourne Central vs. North Melbourne, see stt_mishear.json) — expects a clickable-options clarification, not a guess or an unhandled listing."
+  },
+  {
+    "transcript": "Next train from Box Hill to Hill",
+    "expected_category": "clarification",
+    "expected_fields": {"from_station": "Box Hill", "to_station": "Hill", "route_hint": null, "time": null},
+    "note": "Live-verified ambiguous 'to' station (Box Hill vs. Clifton Hill) — deliberately contrived phrasing to force the ambiguity onto the destination side."
+  },
+  {
+    "transcript": "Next train from north to south",
+    "expected_category": "fallback",
+    "expected_fields": {"from_station": "north", "to_station": "south", "route_hint": null, "time": null},
+    "note": "SEEDED REGRESSION (Session 15 cont., commit 91cc060) at the full pipeline level: bare cardinal directions must degrade to the low-confidence fallback, never false-match every direction-prefixed station."
+  },
+  {
+    "transcript": "When's the next train from Rich Mind to Flinders Street",
+    "expected_category": "clarification",
+    "expected_fields": {"from_station": "Rich Mind", "to_station": "Flinders Street", "route_hint": null, "time": null},
+    "note": "Live-verified below-fuzzy-threshold mishear — expects the LLM-suggestion path to offer 'did you mean Richmond?' rather than a silent wrong-station answer."
+  },
+  {
+    "transcript": "Next train from Southern Cross to Sunbury tonight",
+    "expected_category": "success",
+    "expected_fields": {"from_station": "Southern Cross", "to_station": "Sunbury", "route_hint": null, "time": null},
+    "note": "Same-line, time-of-day phrasing without an explicit clock time."
+  },
+  {
+    "transcript": "Next train from Caulfield to Frankston at 6:15pm",
+    "expected_category": "success",
+    "expected_fields": {"from_station": "Caulfield", "to_station": "Frankston", "route_hint": null, "time": "18:15"},
+    "note": "Same-line with an explicit time, verifies time normalization survives the full pipeline."
+  },
+  {
+    "transcript": "What's the next train from Nowhereville to the city",
+    "expected_category": "clarification",
+    "expected_fields": {"from_station": "Nowhereville", "to_station": "the city", "route_hint": null, "time": null},
+    "note": "Fabricated station name with no plausible fuzzy or LLM-suggested match — expects the honest 'I didn't recognize that station' clarification, not a crash or a wrong guess."
+  },
+  {
+    "transcript": "Next train from Sunshine to Dandenong",
+    "expected_category": "fallback",
+    "expected_fields": {"from_station": "Sunshine", "to_station": "Dandenong", "route_hint": null, "time": null},
+    "note": "Two real, unambiguous stations on different lines with no single-transfer path — expects no_route_found, not an invented multi-leg route."
+  }
+]
