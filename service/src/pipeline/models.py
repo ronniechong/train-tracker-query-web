@@ -13,7 +13,21 @@ class FallbackReason(StrEnum):
     NO_ROUTE_FOUND = "no_route_found"
 
 
+class ExtractedQueryFields(BaseModel):
+    from_station: str | None
+    to_station: str | None
+    route_hint: str | None
+    time: str | None
+
+
+class ClarificationInfo(BaseModel):
+    field: str  # "from" or "to" — which side needs disambiguation
+    suggested_station_name: str | None
+    extracted: ExtractedQueryFields  # the original query, to resubmit with a substitution
+
+
 class QueryResponse(BaseModel):
     text: str
     audio: str | None = None
     fallback_reason: FallbackReason | None = None
+    clarification: ClarificationInfo | None = None

@@ -175,3 +175,113 @@ def test_query_returns_503_when_schedule_unavailable():
     ):
         response = client.post("/api/query", content=b"short audio")
     assert response.status_code == 503
+
+
+def test_query_clarification_includes_structured_suggestion(monkeypatch):
+    from src.pipeline.gate2 import ClarificationNeeded
+    from src.pipeline.models import FallbackReason
+
+    async def fake_transcribe(audio_bytes):
+        return "when's the next train from Murubak to Richmond"
+
+    async def fake_extract(transcript):
+        return ExtractedQuery(from_station="Murubak", to_station="Richmond", route_hint=None, time=None)
+
+    async def fake_resolve_stations(extracted):
+        raise ClarificationNeeded(
+            "I heard 'Murubak' — did you mean Mooroolbark Railway Station?",
+            FallbackReason.LOW_CONFIDENCE_STATION,
+            "from",
+            suggested_station_name="Mooroolbark Railway Station",
+        )
+
+    with (
+        patch("src.pipeline.orchestrator.stt.transcribe", new=AsyncMock(side_effect=fake_transcribe)),
+        patch("src.pipeline.gate2.extract", new=AsyncMock(side_effect=fake_extract)),
+        patch("src.pipeline.gate2.resolve_stations", new=AsyncMock(side_effect=fake_resolve_stations)),
+    ):
+        response = client.post("/api/query", content=b"short audio")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["clarification"]["field"] == "from"
+    assert body["clarification"]["suggested_station_name"] == "Mooroolbark Railway Station"
+    assert body["clarification"]["extracted"]["from_station"] == "Murubak"
+    assert body["clarification"]["extracted"]["to_station"] == "Richmond"
+
+
+def test_query_text_runs_full_pipeline():
+    p1, p2, p3 = _patched_up_to_gate2()
+    success_result = NextServiceResult(
+        from_station=_FROM_REF,
+        to_station=_TO_REF,
+        generated_at="2026-08-26T08:00:00Z",
+        reason=None,
+        legs=[],
+    )
+    with (
+        p1,
+        p2,
+        p3,
+        patch(
+            "src.pipeline.orchestrator.next_service.find_next_service",
+            new=AsyncMock(return_value=success_result),
+        ),
+        patch(
+            "src.pipeline.orchestrator.compose.compose_answer",
+            new=AsyncMock(return_value="Next train departs shortly."),
+        ),
+        patch(
+            "src.pipeline.orchestrator.tts.synthesize",
+            new=AsyncMock(return_value="base64audio"),
+        ),
+    ):
+        response = client.post("/api/query/text", json={"text": "when's the next train from Richmond to Flinders Street"})
+    assert response.status_code == 200
+    assert response.json()["text"] == "Next train departs shortly."
+
+
+def test_query_text_rejects_overlong_text():
+    from src.main import MAX_TEXT_LENGTH
+
+    response = client.post("/api/query/text", json={"text": "x" * (MAX_TEXT_LENGTH + 1)})
+    assert response.status_code == 413
+
+
+def test_query_confirm_skips_stt_and_extraction():
+    success_result = NextServiceResult(
+        from_station=_FROM_REF,
+        to_station=_TO_REF,
+        generated_at="2026-08-26T08:00:00Z",
+        reason=None,
+        legs=[],
+    )
+    with (
+        patch(
+            "src.pipeline.gate2.get_stations",
+            new=AsyncMock(return_value=[_RICHMOND, _FLINDERS]),
+        ),
+        patch(
+            "src.pipeline.orchestrator.next_service.find_next_service",
+            new=AsyncMock(return_value=success_result),
+        ),
+        patch(
+            "src.pipeline.orchestrator.compose.compose_answer",
+            new=AsyncMock(return_value="Next train departs shortly."),
+        ),
+        patch(
+            "src.pipeline.orchestrator.tts.synthesize",
+            new=AsyncMock(return_value="base64audio"),
+        ),
+    ):
+        response = client.post(
+            "/api/query/confirm",
+            json={
+                "from_station": "Richmond",
+                "to_station": "Flinders Street",
+                "route_hint": None,
+                "time": None,
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["text"] == "Next train departs shortly."

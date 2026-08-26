@@ -64,6 +64,8 @@ async def test_ambiguous_name_without_route_hint_raises_clarification():
     with pytest.raises(ClarificationNeeded) as exc_info:
         await resolve_stations(extracted)
     assert exc_info.value.reason is FallbackReason.AMBIGUOUS_STATION
+    assert exc_info.value.field == "to"
+    assert exc_info.value.suggested_station_name is None
 
 
 async def test_route_hint_narrows_ambiguous_match():
@@ -155,6 +157,8 @@ async def test_llm_suggestion_offered_as_did_you_mean(monkeypatch):
         await resolve_stations(extracted)
     assert exc_info.value.reason is FallbackReason.LOW_CONFIDENCE_STATION
     assert "did you mean Flinders Street Railway Station" in exc_info.value.message
+    assert exc_info.value.field == "from"
+    assert exc_info.value.suggested_station_name == "Flinders Street Railway Station"
 
 
 async def test_no_llm_suggestion_falls_back_to_generic_message():

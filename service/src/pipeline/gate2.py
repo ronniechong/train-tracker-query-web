@@ -119,10 +119,18 @@ class ResolvedStations(BaseModel):
 
 
 class ClarificationNeeded(Exception):
-    def __init__(self, message: str, reason: FallbackReason) -> None:
+    def __init__(
+        self,
+        message: str,
+        reason: FallbackReason,
+        field: str,
+        suggested_station_name: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.reason = reason
+        self.field = field
+        self.suggested_station_name = suggested_station_name
 
 
 async def extract(transcript: str) -> ExtractedQuery:
@@ -208,11 +216,14 @@ async def _suggest_closest_station(spoken_name: str, stations: list[Station]) ->
     return by_name.get(guess)
 
 
-async def _resolve_one(spoken_name: str | None, stations: list[Station], route_hint: str | None) -> Station:
+async def _resolve_one(
+    field: str, spoken_name: str | None, stations: list[Station], route_hint: str | None
+) -> Station:
     if spoken_name is None:
         raise ClarificationNeeded(
             "I didn't catch a station name — try asking again.",
             FallbackReason.LOW_CONFIDENCE_STATION,
+            field,
         )
 
     candidates = _match_candidates(spoken_name, stations)
@@ -222,10 +233,13 @@ async def _resolve_one(spoken_name: str | None, stations: list[Station], route_h
             raise ClarificationNeeded(
                 f"I heard '{spoken_name}' — did you mean {suggestion.name}?",
                 FallbackReason.LOW_CONFIDENCE_STATION,
+                field,
+                suggested_station_name=suggestion.name,
             )
         raise ClarificationNeeded(
             f"I heard '{spoken_name}' but couldn't find a matching station — try asking again.",
             FallbackReason.LOW_CONFIDENCE_STATION,
+            field,
         )
 
     narrowed = _narrow_by_route_hint(candidates, route_hint)
@@ -235,6 +249,7 @@ async def _resolve_one(spoken_name: str | None, stations: list[Station], route_h
             f"There are a few stations matching '{spoken_name}' ({options}) — "
             "which line are you near?",
             FallbackReason.AMBIGUOUS_STATION,
+            field,
         )
 
     return narrowed[0]
@@ -242,8 +257,8 @@ async def _resolve_one(spoken_name: str | None, stations: list[Station], route_h
 
 async def resolve_stations(extracted: ExtractedQuery) -> ResolvedStations:
     stations = await get_stations()
-    from_station = await _resolve_one(extracted.from_station, stations, extracted.route_hint)
-    to_station = await _resolve_one(extracted.to_station, stations, extracted.route_hint)
+    from_station = await _resolve_one("from", extracted.from_station, stations, extracted.route_hint)
+    to_station = await _resolve_one("to", extracted.to_station, stations, extracted.route_hint)
     return ResolvedStations(
         from_station_id=from_station.station_id,
         from_station_name=from_station.name,

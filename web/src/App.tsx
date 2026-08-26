@@ -5,29 +5,45 @@ const MAX_RECORDING_MS = 30_000
 
 type Stage = 'idle' | 'recording' | 'processing' | 'result' | 'error'
 
+interface ExtractedQueryFields {
+  from_station: string | null
+  to_station: string | null
+  route_hint: string | null
+  time: string | null
+}
+
+interface ClarificationInfo {
+  field: string
+  suggested_station_name: string | null
+  extracted: ExtractedQueryFields
+}
+
 interface QueryResponse {
   text: string
   audio: string | null
   fallback_reason: string | null
+  clarification: ClarificationInfo | null
+}
+
+function playAudio(base64: string) {
+  const audio = new Audio(`data:audio/wav;base64,${base64}`)
+  void audio.play()
 }
 
 function App() {
   const [stage, setStage] = useState<Stage>('idle')
   const [result, setResult] = useState<QueryResponse | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [textInput, setTextInput] = useState('')
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const stopTimerRef = useRef<number | null>(null)
 
-  const submitAudio = useCallback(async (blob: Blob) => {
+  const runQuery = useCallback(async (path: string, init: RequestInit) => {
     setStage('processing')
     try {
-      const response = await fetch('/api/query', {
-        method: 'POST',
-        headers: { 'Content-Type': blob.type || 'audio/webm' },
-        body: blob,
-      })
+      const response = await fetch(path, init)
       if (!response.ok) {
         const detail = await response.text()
         throw new Error(`${response.status}: ${detail}`)
@@ -35,15 +51,45 @@ function App() {
       const body: QueryResponse = await response.json()
       setResult(body)
       setStage('result')
-      if (body.audio) {
-        const audio = new Audio(`data:audio/wav;base64,${body.audio}`)
-        void audio.play()
-      }
+      if (body.audio) playAudio(body.audio)
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong.')
       setStage('error')
     }
   }, [])
+
+  const submitAudio = useCallback(
+    (blob: Blob) =>
+      runQuery('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type || 'audio/webm' },
+        body: blob,
+      }),
+    [runQuery],
+  )
+
+  const submitText = useCallback(
+    (text: string) =>
+      runQuery('/api/query/text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      }),
+    [runQuery],
+  )
+
+  const confirmSuggestion = useCallback(
+    (clarification: ClarificationInfo) => {
+      const field = `${clarification.field}_station`
+      const body = { ...clarification.extracted, [field]: clarification.suggested_station_name }
+      return runQuery('/api/query/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    },
+    [runQuery],
+  )
 
   const stopRecording = useCallback(() => {
     if (stopTimerRef.current !== null) {
@@ -80,9 +126,22 @@ function App() {
     }
   }, [stopRecording, submitAudio])
 
+  const handleTextSubmit = useCallback(
+    (event: React.FormEvent) => {
+      event.preventDefault()
+      const text = textInput.trim()
+      if (!text) return
+      setResult(null)
+      setErrorMessage(null)
+      void submitText(text)
+    },
+    [textInput, submitText],
+  )
+
   const reset = useCallback(() => {
     setResult(null)
     setErrorMessage(null)
+    setTextInput('')
     setStage('idle')
   }, [])
 
@@ -96,9 +155,22 @@ function App() {
       </p>
 
       {stage === 'idle' && (
-        <button type="button" onClick={() => void startRecording()}>
-          Ask a question
-        </button>
+        <div className="idle-controls">
+          <button type="button" onClick={() => void startRecording()}>
+            Ask a question
+          </button>
+          <form className="text-form" onSubmit={handleTextSubmit}>
+            <input
+              type="text"
+              placeholder="Or type your question…"
+              value={textInput}
+              onChange={(event) => setTextInput(event.target.value)}
+            />
+            <button type="submit" disabled={!textInput.trim()}>
+              Ask
+            </button>
+          </form>
+        </div>
       )}
 
       {stage === 'recording' && (
@@ -119,6 +191,11 @@ function App() {
       {stage === 'result' && result && (
         <div className={`status ${result.fallback_reason ? 'status-fallback' : 'status-answer'}`}>
           <p>{result.text}</p>
+          {result.clarification?.suggested_station_name && (
+            <button type="button" onClick={() => void confirmSuggestion(result.clarification!)}>
+              Yes, use {result.clarification.suggested_station_name}
+            </button>
+          )}
           <button type="button" onClick={reset}>
             Ask another question
           </button>
