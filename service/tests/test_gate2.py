@@ -1,5 +1,8 @@
+import json
+
 import pytest
 
+from src.pipeline import gate2
 from src.pipeline.gate2 import ClarificationNeeded, ExtractedQuery, resolve_stations
 from src.pipeline.models import FallbackReason
 from src.pipeline.stations_cache import Route, Station
@@ -22,6 +25,11 @@ _FLINDERS = Station(
 
 _STATIONS = [_RICHMOND_BELGRAVE, _RICHMOND_ALAMEIN, _FLINDERS]
 
+# Captured before the autouse fixture below replaces the module attribute,
+# so tests exercising the real implementation directly aren't shadowed by
+# the default "no suggestion" mock every other test relies on.
+_real_suggest_closest_station = gate2._suggest_closest_station
+
 
 @pytest.fixture(autouse=True)
 def _mock_stations(monkeypatch):
@@ -29,6 +37,17 @@ def _mock_stations(monkeypatch):
         return _STATIONS
 
     monkeypatch.setattr("src.pipeline.gate2.get_stations", fake_get_stations)
+
+
+@pytest.fixture(autouse=True)
+def _no_llm_suggestion_by_default(monkeypatch):
+    # Every no-match case now consults an LLM suggestion step (see
+    # test_llm_suggestion_*) — default it to "no suggestion" so tests
+    # that don't care about that behaviour don't make a live call.
+    async def fake_suggest(spoken_name, stations):
+        return None
+
+    monkeypatch.setattr("src.pipeline.gate2._suggest_closest_station", fake_suggest)
 
 
 async def test_confident_single_match_resolves():
@@ -120,3 +139,76 @@ async def test_coincidental_fuzzy_overlap_does_not_falsely_match():
     with pytest.raises(ClarificationNeeded) as exc_info:
         await resolve_stations(extracted)
     assert exc_info.value.reason is FallbackReason.LOW_CONFIDENCE_STATION
+
+
+async def test_llm_suggestion_offered_as_did_you_mean(monkeypatch):
+    # When no string-based match exists at all (e.g. a severe mishear
+    # like "Murubak" for "Mooroolbark", too mangled for any fuzzy
+    # threshold), an LLM fallback may suggest a station — but only ever
+    # as a question the user must confirm, never a silent resolution.
+    async def fake_suggest(spoken_name, stations):
+        return _FLINDERS
+
+    monkeypatch.setattr("src.pipeline.gate2._suggest_closest_station", fake_suggest)
+    extracted = ExtractedQuery(from_station="Xylophonia", to_station="Richmond", route_hint="Belgrave", time=None)
+    with pytest.raises(ClarificationNeeded) as exc_info:
+        await resolve_stations(extracted)
+    assert exc_info.value.reason is FallbackReason.LOW_CONFIDENCE_STATION
+    assert "did you mean Flinders Street Railway Station" in exc_info.value.message
+
+
+async def test_no_llm_suggestion_falls_back_to_generic_message():
+    extracted = ExtractedQuery(
+        from_station="Xylophonia", to_station="Richmond", route_hint="Belgrave", time=None
+    )
+    with pytest.raises(ClarificationNeeded) as exc_info:
+        await resolve_stations(extracted)
+    assert "did you mean" not in exc_info.value.message
+    assert "couldn't find a matching station" in exc_info.value.message
+
+
+class _FakeMessage:
+    def __init__(self, content):
+        self.content = content
+
+
+class _FakeChoice:
+    def __init__(self, content):
+        self.message = _FakeMessage(content)
+
+
+class _FakeResponse:
+    def __init__(self, content):
+        self.choices = [_FakeChoice(content)]
+
+
+class _FakeCompletions:
+    def __init__(self, content):
+        self._content = content
+
+    async def create(self, **kwargs):
+        return _FakeResponse(self._content)
+
+
+class _FakeChat:
+    def __init__(self, content):
+        self.completions = _FakeCompletions(content)
+
+
+class _FakeClient:
+    def __init__(self, content):
+        self.chat = _FakeChat(content)
+
+
+async def test_suggest_closest_station_returns_matched_station(monkeypatch):
+    monkeypatch.setattr(
+        gate2, "_get_client", lambda: _FakeClient(json.dumps({"best_guess": "Flinders Street Railway Station"}))
+    )
+    result = await _real_suggest_closest_station("murubak", _STATIONS)
+    assert result is _FLINDERS
+
+
+async def test_suggest_closest_station_returns_none_when_llm_declines(monkeypatch):
+    monkeypatch.setattr(gate2, "_get_client", lambda: _FakeClient(json.dumps({"best_guess": "NONE"})))
+    result = await _real_suggest_closest_station("asdf qwerty", _STATIONS)
+    assert result is None
