@@ -1,8 +1,11 @@
 import json
+import logging
 
-from groq import AsyncGroq
+from groq import AsyncGroq, GroqError
 from pydantic import BaseModel
 from rapidfuzz import fuzz
+
+_logger = logging.getLogger(__name__)
 
 from . import tracing
 from .models import FallbackReason
@@ -218,6 +221,15 @@ def _top_candidates(spoken_name: str, stations: list[Station]) -> list[Station]:
 
 
 async def _suggest_closest_station(spoken_name: str, stations: list[Station], span=None) -> Station | None:
+    # A bare cardinal direction carries no station information at all (see
+    # _BARE_DIRECTIONS above) — without this check it still reaches the LLM
+    # with a plausible-looking candidate list and can confidently suggest a
+    # wrong station (live-verified: "South" alone suggested "South Yarra").
+    # _match_candidates already excludes these from fuzzy/word-subset
+    # matching; this is the same exclusion applied to the suggestion path.
+    if _normalize(spoken_name) in _BARE_DIRECTIONS:
+        return None
+
     candidates = _top_candidates(spoken_name, stations)
     by_name = {s.name: s for s in candidates}
     schema = {
@@ -228,21 +240,30 @@ async def _suggest_closest_station(spoken_name: str, stations: list[Station], sp
         "required": ["best_guess"],
         "additionalProperties": False,
     }
-    response = await _get_client().chat.completions.create(
-        model=_SUGGESTION_MODEL,
-        temperature=0,
-        messages=[
-            {"role": "system", "content": _SUGGESTION_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"Heard: {spoken_name}\n\nCandidates:\n" + "\n".join(by_name),
+    try:
+        response = await _get_client().chat.completions.create(
+            model=_SUGGESTION_MODEL,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": _SUGGESTION_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": f"Heard: {spoken_name}\n\nCandidates:\n" + "\n".join(by_name),
+                },
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": "suggestion", "schema": schema, "strict": True},
             },
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {"name": "suggestion", "schema": schema, "strict": True},
-        },
-    )
+        )
+    except GroqError:
+        # Live-verified: this call intermittently fails generation entirely
+        # (schema validation error) even with a generous token budget. A
+        # failed suggestion is just a missed opportunity to help, not a
+        # reason to fail the whole query — degrade to no-suggestion, same
+        # as the model declining on its own.
+        _logger.warning("Groq suggestion call failed for %r, degrading to no suggestion", spoken_name)
+        return None
     tracing.record_chat_cost(span, _SUGGESTION_MODEL, response)
     guess = json.loads(response.choices[0].message.content)["best_guess"]
     return by_name.get(guess)

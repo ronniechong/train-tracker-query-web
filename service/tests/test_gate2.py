@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from groq import GroqError
 
 from src.pipeline import gate2
 from src.pipeline.gate2 import ClarificationNeeded, ExtractedQuery, _match_candidates, resolve_stations
@@ -271,4 +272,42 @@ async def test_suggest_closest_station_returns_matched_station(monkeypatch):
 async def test_suggest_closest_station_returns_none_when_llm_declines(monkeypatch):
     monkeypatch.setattr(gate2, "_get_client", lambda: _FakeClient(json.dumps({"best_guess": "NONE"})))
     result = await _real_suggest_closest_station("asdf qwerty", _STATIONS)
+    assert result is None
+
+
+async def test_suggest_closest_station_never_calls_llm_for_bare_direction(monkeypatch):
+    # Live-verified regression (2026-08-27): "south" alone previously reached
+    # the LLM and got suggested as "South Yarra" — a bare direction carries
+    # no station information, same exclusion as _match_candidates already
+    # applies, so this must short-circuit before ever calling Groq.
+    def _fail_if_called():
+        raise AssertionError("must not call Groq for a bare direction")
+
+    monkeypatch.setattr(gate2, "_get_client", _fail_if_called)
+    result = await _real_suggest_closest_station("south", _STATIONS)
+    assert result is None
+
+
+class _FailingCompletions:
+    async def create(self, **kwargs):
+        raise GroqError("simulated API failure")
+
+
+class _FailingChat:
+    def __init__(self):
+        self.completions = _FailingCompletions()
+
+
+class _FailingClient:
+    def __init__(self):
+        self.chat = _FailingChat()
+
+
+async def test_suggest_closest_station_degrades_on_groq_error(monkeypatch):
+    # Live-verified regression (2026-08-27): a real 400 json_validate_failed
+    # from Groq previously propagated unhandled all the way up through
+    # resolve_stations, crashing the request instead of degrading to the
+    # honest "no suggestion" fallback the caller already handles.
+    monkeypatch.setattr(gate2, "_get_client", lambda: _FailingClient())
+    result = await _real_suggest_closest_station("murubak", _STATIONS)
     assert result is None
