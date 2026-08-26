@@ -54,7 +54,9 @@ class ExtractedQuery(BaseModel):
 
 class ResolvedStations(BaseModel):
     from_station_id: str
+    from_station_name: str
     to_station_id: str
+    to_station_name: str
 
 
 class ClarificationNeeded(Exception):
@@ -102,7 +104,7 @@ def _narrow_by_route_hint(
     return narrowed or candidates
 
 
-def _resolve_one(spoken_name: str | None, stations: list[Station], route_hint: str | None) -> str:
+def _resolve_one(spoken_name: str | None, stations: list[Station], route_hint: str | None) -> Station:
     if spoken_name is None:
         raise ClarificationNeeded(
             "I didn't catch a station name — try asking again.",
@@ -126,11 +128,16 @@ def _resolve_one(spoken_name: str | None, stations: list[Station], route_hint: s
         )
 
     best_station, _ = narrowed[0]
-    return best_station.station_id
+    return best_station
 
 
 async def resolve_stations(extracted: ExtractedQuery) -> ResolvedStations:
     stations = await get_stations()
-    from_id = _resolve_one(extracted.from_station, stations, extracted.route_hint)
-    to_id = _resolve_one(extracted.to_station, stations, extracted.route_hint)
-    return ResolvedStations(from_station_id=from_id, to_station_id=to_id)
+    from_station = _resolve_one(extracted.from_station, stations, extracted.route_hint)
+    to_station = _resolve_one(extracted.to_station, stations, extracted.route_hint)
+    return ResolvedStations(
+        from_station_id=from_station.station_id,
+        from_station_name=from_station.name,
+        to_station_id=to_station.station_id,
+        to_station_name=to_station.name,
+    )
