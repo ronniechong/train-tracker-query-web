@@ -7,11 +7,14 @@ from src.pipeline.stations_cache import Route, Station
 _BELGRAVE = Route(route_id="belgrave", short_name="Belgrave", long_name="Belgrave - City")
 _ALAMEIN = Route(route_id="alamein", short_name="Alamein", long_name="Alamein - City")
 
+# Real station names are always unique (verified live against train-tracker's
+# API) — ambiguity comes from distinct names that both fuzzy-match a bare
+# spoken word, not from two stations sharing one literal name.
 _RICHMOND_BELGRAVE = Station(
     station_id="richmond-belgrave", name="Richmond Railway Station", routes=[_BELGRAVE]
 )
 _RICHMOND_ALAMEIN = Station(
-    station_id="richmond-alamein", name="Richmond (Alamein Line)", routes=[_ALAMEIN]
+    station_id="richmond-alamein", name="North Richmond Railway Station", routes=[_ALAMEIN]
 )
 _FLINDERS = Station(
     station_id="flinders", name="Flinders Street Railway Station", routes=[_BELGRAVE, _ALAMEIN]

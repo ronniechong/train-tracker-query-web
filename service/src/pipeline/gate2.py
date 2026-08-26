@@ -15,6 +15,17 @@ _EXTRACTION_MODEL = "openai/gpt-oss-20b"
 _LOW_CONFIDENCE_THRESHOLD = 70
 _ROUTE_HINT_THRESHOLD = 70
 
+# Every station name shares this suffix, which otherwise inflates WRatio
+# scores enough to make unrelated stations look like ambiguous matches
+# (e.g. "North Melbourne" vs. "Melbourne Central").
+_NAME_SUFFIX = " Railway Station"
+
+
+def _normalize(name: str) -> str:
+    if name.endswith(_NAME_SUFFIX):
+        return name[: -len(_NAME_SUFFIX)]
+    return name
+
 _EXTRACTION_SYSTEM_PROMPT = (
     "Extract the origin station, destination station, an optional line/"
     "route name if one is explicitly mentioned, and an optional time if "
@@ -83,7 +94,8 @@ async def extract(transcript: str) -> ExtractedQuery:
 
 
 def _match_candidates(name: str, stations: list[Station]) -> list[tuple[Station, float]]:
-    scored = [(s, fuzz.WRatio(name, s.name)) for s in stations]
+    normalized_name = _normalize(name)
+    scored = [(s, fuzz.token_sort_ratio(normalized_name, _normalize(s.name))) for s in stations]
     return [(s, score) for s, score in scored if score >= _LOW_CONFIDENCE_THRESHOLD]
 
 
