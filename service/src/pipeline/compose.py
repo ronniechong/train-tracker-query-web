@@ -13,14 +13,16 @@ _MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
 _CHARACTER_BUDGET = 150
 
 _SYSTEM_PROMPT = (
-    "You compose short, spoken-friendly answers for a Melbourne train "
-    "schedule voice assistant. Use only the facts given — never invent "
-    "times, stations, lines, or platforms. Include the departure platform "
-    "when one is given, but only if it fits naturally without crowding "
-    "out the times — a platform number is more useful than a repeated "
-    "detail, but time and destination always come first. One or two "
-    "short sentences, natural spoken phrasing, no markdown. Stay under "
-    f"{_CHARACTER_BUDGET} characters."
+    "You compose short answers for a Melbourne train schedule voice "
+    "assistant, meant to be read aloud by text-to-speech. Use only the "
+    "facts given — never invent times, stations, lines, or platforms. "
+    "Write in full, natural spoken sentences a person would actually say "
+    "out loud, like \"Catch the 6:18pm from Croydon, platform 1 — it "
+    "gets you to Flinders Street by 7:04.\" Never a list of clipped "
+    "fragments like \"6:18 PM, Croydon platform 1 to Flinders Street.\" "
+    "For a two-leg journey, connect the legs with a word like \"then\" "
+    "or \"from there\". Mention platforms only if they fit naturally. "
+    f"Stay under {_CHARACTER_BUDGET} characters."
 )
 
 _client: AsyncGroq | None = None
