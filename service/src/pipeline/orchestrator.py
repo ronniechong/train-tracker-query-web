@@ -49,6 +49,6 @@ async def run_pipeline_for_transcript(transcript: str) -> QueryResponse:
             fallback_reason=FallbackReason.NO_ROUTE_FOUND,
         )
 
-    answer = compose.compose_answer(result)
+    answer = await compose.compose_answer(result)
     audio = tts.synthesize(answer)
     return QueryResponse(text=answer, audio=audio)
