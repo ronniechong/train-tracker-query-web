@@ -1,102 +1,227 @@
 [
   {
     "transcript": "When's the next train from Richmond to Flinders Street?",
-    "expected": {"from_station": "Richmond", "to_station": "Flinders Street", "route_hint": null, "time": null}
+    "expected": {
+      "from_station": "Richmond",
+      "to_station": "Flinders Street",
+      "route_hint": null,
+      "time": null
+    }
   },
   {
     "transcript": "I need to get from Southern Cross to Sunshine on the Sunbury line",
-    "expected": {"from_station": "Southern Cross", "to_station": "Sunshine", "route_hint": "Sunbury", "time": null}
+    "expected": {
+      "from_station": "Southern Cross",
+      "to_station": "Sunshine",
+      "route_hint": "Sunbury line",
+      "time": null
+    }
   },
   {
     "transcript": "What time is the next train from North Melbourne to Craigieburn at 5:30pm",
-    "expected": {"from_station": "North Melbourne", "to_station": "Craigieburn", "route_hint": null, "time": "17:30"}
+    "expected": {
+      "from_station": "North Melbourne",
+      "to_station": "Craigieburn",
+      "route_hint": null,
+      "time": "17:30"
+    }
   },
   {
     "transcript": "Next service from Camberwell to the city on the Belgrave line please",
-    "expected": {"from_station": "Camberwell", "to_station": "the city", "route_hint": "Belgrave", "time": null}
+    "expected": {
+      "from_station": "Camberwell",
+      "to_station": "the city",
+      "route_hint": "Belgrave line",
+      "time": null
+    }
   },
   {
     "transcript": "When does the next train leave Frankston for Southern Cross",
-    "expected": {"from_station": "Frankston", "to_station": "Southern Cross", "route_hint": null, "time": null}
+    "expected": {
+      "from_station": "Frankston",
+      "to_station": "Southern Cross",
+      "route_hint": null,
+      "time": null
+    }
   },
   {
     "transcript": "Train from Glen Waverley to Richmond at quarter past 8",
-    "expected": {"from_station": "Glen Waverley", "to_station": "Richmond", "route_hint": null, "time": "08:15"}
+    "expected": {
+      "from_station": "Glen Waverley",
+      "to_station": "Richmond",
+      "route_hint": null,
+      "time": "08:15"
+    }
   },
   {
     "transcript": "Next Werribee line train from Footscray to Southern Cross",
-    "expected": {"from_station": "Footscray", "to_station": "Southern Cross", "route_hint": "Werribee", "time": null}
+    "expected": {
+      "from_station": "Footscray",
+      "to_station": "Southern Cross",
+      "route_hint": "Werribee line",
+      "time": null
+    }
   },
   {
     "transcript": "When's the next Pakenham train from Dandenong to Flinders Street tomorrow",
-    "expected": {"from_station": "Dandenong", "to_station": "Flinders Street", "route_hint": "Pakenham", "time": null}
+    "expected": {
+      "from_station": "Dandenong",
+      "to_station": "Flinders Street",
+      "route_hint": "Pakenham",
+      "time": null
+    }
   },
   {
     "transcript": "Get me from Ringwood to Box Hill",
-    "expected": {"from_station": "Ringwood", "to_station": "Box Hill", "route_hint": null, "time": null}
+    "expected": {
+      "from_station": "Ringwood",
+      "to_station": "Box Hill",
+      "route_hint": null,
+      "time": null
+    }
   },
   {
     "transcript": "What's the weather like in Richmond",
-    "expected": {"from_station": null, "to_station": null, "route_hint": null, "time": null}
+    "expected": {
+      "from_station": null,
+      "to_station": null,
+      "route_hint": null,
+      "time": null
+    }
   },
   {
     "transcript": "Next train from Clifton Hill to Westgarth around 9am",
-    "expected": {"from_station": "Clifton Hill", "to_station": "Westgarth", "route_hint": null, "time": "09:00"}
+    "expected": {
+      "from_station": "Clifton Hill",
+      "to_station": "Westgarth",
+      "route_hint": null,
+      "time": "09:00"
+    }
   },
   {
     "transcript": "Train to Craigieburn from Essendon at ten to six",
-    "expected": {"from_station": "Essendon", "to_station": "Craigieburn", "route_hint": null, "time": "17:50"}
+    "expected": {
+      "from_station": "Essendon",
+      "to_station": "Craigieburn",
+      "route_hint": null,
+      "time": "17:50"
+    }
   },
   {
     "transcript": "Hurstbridge line, next train from Eltham to Jolimont",
-    "expected": {"from_station": "Eltham", "to_station": "Jolimont", "route_hint": "Hurstbridge", "time": null}
+    "expected": {
+      "from_station": "Eltham",
+      "to_station": "Jolimont",
+      "route_hint": "Hurstbridge line",
+      "time": null
+    }
   },
   {
     "transcript": "When's the next one from South Yarra to Malvern",
-    "expected": {"from_station": "South Yarra", "to_station": "Malvern", "route_hint": null, "time": null}
+    "expected": {
+      "from_station": "South Yarra",
+      "to_station": "Malvern",
+      "route_hint": null,
+      "time": null
+    }
   },
   {
     "transcript": "Next train from Mernda to Flinders Street at midday",
-    "expected": {"from_station": "Mernda", "to_station": "Flinders Street", "route_hint": null, "time": "12:00"}
+    "expected": {
+      "from_station": "Mernda",
+      "to_station": "Flinders Street",
+      "route_hint": null,
+      "time": "12:00"
+    }
   },
   {
     "transcript": "From Williamstown to North Melbourne on the Williamstown line",
-    "expected": {"from_station": "Williamstown", "to_station": "North Melbourne", "route_hint": "Williamstown", "time": null}
+    "expected": {
+      "from_station": "Williamstown",
+      "to_station": "North Melbourne",
+      "route_hint": "Williamstown line",
+      "time": null
+    }
   },
   {
     "transcript": "Train from Cranbourne to the city at 7 in the morning",
-    "expected": {"from_station": "Cranbourne", "to_station": "the city", "route_hint": null, "time": "07:00"}
+    "expected": {
+      "from_station": "Cranbourne",
+      "to_station": "the city",
+      "route_hint": null,
+      "time": "07:00"
+    }
   },
   {
     "transcript": "Next Sandringham line service from Elsternwick to Flinders Street",
-    "expected": {"from_station": "Elsternwick", "to_station": "Flinders Street", "route_hint": "Sandringham", "time": null}
+    "expected": {
+      "from_station": "Elsternwick",
+      "to_station": "Flinders Street",
+      "route_hint": "Sandringham line",
+      "time": null
+    }
   },
   {
     "transcript": "What time does the next train from Upfield to Coburg leave",
-    "expected": {"from_station": "Upfield", "to_station": "Coburg", "route_hint": null, "time": null}
+    "expected": {
+      "from_station": "Upfield",
+      "to_station": "Coburg",
+      "route_hint": null,
+      "time": null
+    }
   },
   {
     "transcript": "Next train from Alamein to Camberwell at 6:45pm",
-    "expected": {"from_station": "Alamein", "to_station": "Camberwell", "route_hint": null, "time": "18:45"}
+    "expected": {
+      "from_station": "Alamein",
+      "to_station": "Camberwell",
+      "route_hint": null,
+      "time": "18:45"
+    }
   },
   {
     "transcript": "From Lilydale to Ringwood, next available",
-    "expected": {"from_station": "Lilydale", "to_station": "Ringwood", "route_hint": null, "time": null}
+    "expected": {
+      "from_station": "Lilydale",
+      "to_station": "Ringwood",
+      "route_hint": null,
+      "time": null
+    }
   },
   {
     "transcript": "Next Frankston line train from Caulfield to Richmond at 4",
-    "expected": {"from_station": "Caulfield", "to_station": "Richmond", "route_hint": "Frankston", "time": "16:00"}
+    "expected": {
+      "from_station": "Caulfield",
+      "to_station": "Richmond",
+      "route_hint": "Frankston line",
+      "time": "16:00"
+    }
   },
   {
     "transcript": "Train from Footscray to Sunshine",
-    "expected": {"from_station": "Footscray", "to_station": "Sunshine", "route_hint": null, "time": null}
+    "expected": {
+      "from_station": "Footscray",
+      "to_station": "Sunshine",
+      "route_hint": null,
+      "time": null
+    }
   },
   {
     "transcript": "Can you tell me a joke about trains",
-    "expected": {"from_station": null, "to_station": null, "route_hint": null, "time": null}
+    "expected": {
+      "from_station": null,
+      "to_station": null,
+      "route_hint": null,
+      "time": null
+    }
   },
   {
     "transcript": "Next train leaving North Richmond for East Richmond",
-    "expected": {"from_station": "North Richmond", "to_station": "East Richmond", "route_hint": null, "time": null}
+    "expected": {
+      "from_station": "North Richmond",
+      "to_station": "East Richmond",
+      "route_hint": null,
+      "time": null
+    }
   }
 ]
