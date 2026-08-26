@@ -8,20 +8,29 @@ from .next_service import NextServiceResult
 _COMPOSITION_MODEL = "openai/gpt-oss-20b"
 _MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
 
-# Matches the 150-char cap the $10/day cost ceiling was priced against
-# (Milestone 02 decision gate) — Orpheus TTS bills per character.
-_CHARACTER_BUDGET = 150
+# Raised from 150 after real usage asked for full station names, platform,
+# and am/pm on every time — that content alone runs ~185 chars for a
+# two-leg journey. Cost impact is trivial (Orpheus TTS at $22/1M chars,
+# still well under the $10/day cap addendum-02 priced against 150).
+_CHARACTER_BUDGET = 220
 
 _SYSTEM_PROMPT = (
     "You compose short answers for a Melbourne train schedule voice "
     "assistant, meant to be read aloud by text-to-speech. Use only the "
     "facts given — never invent times, stations, lines, or platforms. "
     "Write in full, natural spoken sentences a person would actually say "
-    "out loud, like \"Catch the 6:18pm from Croydon, platform 1 — it "
-    "gets you to Flinders Street by 7:04.\" Never a list of clipped "
-    "fragments like \"6:18 PM, Croydon platform 1 to Flinders Street.\" "
-    "For a two-leg journey, connect the legs with a word like \"then\" "
-    "or \"from there\". Mention platforms only if they fit naturally. "
+    "out loud, connecting a two-leg journey with a word like \"then\". "
+    "Every station must be named in full, e.g. \"Hoppers Crossing "
+    "Station\", never just \"Hoppers Crossing\". Every departure time "
+    "must include am or pm, e.g. \"3:35pm\", never a bare number like "
+    "\"3:35\". Always state the platform for each leg, phrased as "
+    "\"on Platform 1\". Only state an arrival time for the final "
+    "destination of the whole journey (with am/pm) — not for an "
+    "intermediate interchange. Example for a two-leg journey: \"Catch "
+    "the 3:35pm from Hoppers Crossing Station on Platform 1 to Southern "
+    "Cross Station. Then board the 4:10pm from Southern Cross Station on "
+    "Platform 10 to Mooroolbark Station at 4:59pm.\" Never a list of "
+    "clipped fragments. "
     f"Stay under {_CHARACTER_BUDGET} characters."
 )
 
@@ -37,27 +46,41 @@ def _get_client() -> AsyncGroq:
 
 def _local_time(iso_timestamp: str) -> str:
     dt = datetime.fromisoformat(iso_timestamp).astimezone(_MELBOURNE_TZ)
-    return dt.strftime("%-I:%M %p")
+    return dt.strftime("%-I:%M%p").lower()
+
+
+def _station_name(name: str) -> str:
+    # "Hoppers Crossing Railway Station" -> "Hoppers Crossing Station" —
+    # matches how people actually say these names out loud.
+    return name.replace(" Railway Station", " Station")
 
 
 def _facts(result: NextServiceResult) -> str:
     lines = []
     for i, leg in enumerate(result.legs, start=1):
-        platform = f", platform {leg.from_platform_code}" if leg.from_platform_code else ""
+        is_final_leg = i == len(result.legs)
+        platform = f" on platform {leg.from_platform_code}" if leg.from_platform_code else ""
+        arrival = (
+            f", arriving {_local_time(leg.arrival_time)} at {_station_name(leg.to_station.name)}"
+            if is_final_leg
+            else ""
+        )
         lines.append(
-            f"Leg {i}: depart {leg.from_station.name} at {_local_time(leg.departure_time)}"
-            f"{platform}, arrive {leg.to_station.name} at {_local_time(leg.arrival_time)}, "
-            f"towards {leg.headsign}."
+            f"Leg {i}: depart {_station_name(leg.from_station.name)} at "
+            f"{_local_time(leg.departure_time)}{platform}, towards "
+            f"{_station_name(leg.to_station.name)}{arrival}."
         )
     return "\n".join(lines)
 
 
 def _fallback_answer(result: NextServiceResult) -> str:
     leg = result.legs[0]
-    platform = f", platform {leg.from_platform_code}" if leg.from_platform_code else ""
+    platform = f" on platform {leg.from_platform_code}" if leg.from_platform_code else ""
     answer = (
-        f"Next train from {result.from_station.name} to {result.to_station.name} "
-        f"departs at {_local_time(leg.departure_time)}{platform}."
+        f"Catch the {_local_time(leg.departure_time)} from "
+        f"{_station_name(result.from_station.name)}{platform} to "
+        f"{_station_name(result.to_station.name)}, arriving "
+        f"{_local_time(leg.arrival_time)}."
     )
     return answer[:_CHARACTER_BUDGET]
 
