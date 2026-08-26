@@ -3,7 +3,7 @@ import json
 import pytest
 
 from src.pipeline import gate2
-from src.pipeline.gate2 import ClarificationNeeded, ExtractedQuery, resolve_stations
+from src.pipeline.gate2 import ClarificationNeeded, ExtractedQuery, _match_candidates, resolve_stations
 from src.pipeline.models import FallbackReason
 from src.pipeline.stations_cache import Route, Station
 
@@ -88,6 +88,31 @@ async def test_ambiguous_name_without_route_hint_raises_clarification(monkeypatc
     assert exc_info.value.field == "to"
     assert exc_info.value.suggested_station_name is None
     assert exc_info.value.options == ["East Richmond Railway Station", "North Richmond Railway Station"]
+
+
+def test_bare_cardinal_direction_matches_nothing():
+    # "north to south" isn't a station name at all, but "north"
+    # word-subset-matches every real "North "-prefixed station (North
+    # Melbourne, North Richmond, ...) — it must not be offered back as if
+    # one of those was plausibly meant.
+    assert _match_candidates("north", _STATIONS) == []
+    assert _match_candidates("south", _STATIONS) == []
+
+
+def test_direction_as_part_of_compound_name_still_matches():
+    # The bare-direction exclusion must not blunt real compound names
+    # that happen to start with a direction word.
+    assert [s.name for s in _match_candidates("North Richmond", _STATIONS)] == [
+        "North Richmond Railway Station"
+    ]
+
+
+async def test_bare_direction_raises_low_confidence_clarification():
+    extracted = ExtractedQuery(from_station="North", to_station="Flinders Street", route_hint=None, time=None)
+    with pytest.raises(ClarificationNeeded) as exc_info:
+        await resolve_stations(extracted)
+    assert exc_info.value.reason is FallbackReason.LOW_CONFIDENCE_STATION
+    assert exc_info.value.field == "from"
 
 
 async def test_route_hint_narrows_ambiguous_match(monkeypatch):

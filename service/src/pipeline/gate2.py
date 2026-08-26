@@ -33,8 +33,22 @@ _NAME_SUFFIX = " railway station"
 # Generic words people add when speaking a station name ("Flinders
 # station", "the Richmond stop") that carry no distinguishing
 # information, since every candidate is a station — stripped from both
-# sides so they never cost a match.
+# sides so they never cost a match. Cardinal directions are deliberately
+# NOT included here even though they're just as "generic" in isolation —
+# unlike "the"/"station", they're load-bearing in real compound station
+# names (East Richmond, North Melbourne, West Footscray), so stripping
+# them from both sides would make "East Richmond" and "Richmond"
+# normalize identically and silently destroy the disambiguation between
+# them. See _BARE_DIRECTIONS below for the narrower fix this needs.
 _STOPWORDS = {"station", "stations", "the"}
+
+# A bare cardinal direction with nothing else ("next train from north to
+# south") isn't a station name at all, but word-subset-matches every real
+# "North "/"South "-prefixed station (North Melbourne, North Richmond, ...)
+# and gets offered back as if one of those was plausibly meant. Handled
+# separately from _STOPWORDS (see comment above) — only the spoken side is
+# ever checked against this set, real station names are untouched.
+_BARE_DIRECTIONS = {"north", "south", "east", "west"}
 
 
 def _normalize(name: str) -> str:
@@ -163,6 +177,8 @@ def _is_confident_match(spoken: str, candidate: str) -> bool:
 
 def _match_candidates(name: str, stations: list[Station]) -> list[Station]:
     normalized_name = _normalize(name)
+    if normalized_name in _BARE_DIRECTIONS:
+        return []
     # An exact normalized match always wins outright, even when the same
     # text would also word-subset-match sibling stations (e.g. "Richmond"
     # is a subset of "East Richmond" too). Without this, confirming an
