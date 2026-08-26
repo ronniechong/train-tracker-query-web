@@ -50,5 +50,5 @@ async def run_pipeline_for_transcript(transcript: str) -> QueryResponse:
         )
 
     answer = await compose.compose_answer(result)
-    audio = tts.synthesize(answer)
+    audio = await tts.synthesize(answer)
     return QueryResponse(text=answer, audio=audio)

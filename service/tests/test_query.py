@@ -53,7 +53,7 @@ def test_query_rejects_audio_over_5mb():
     assert response.status_code == 413
 
 
-def test_query_returns_not_implemented_for_unbuilt_compose():
+def test_query_returns_composed_answer_and_audio_on_success():
     success_result = NextServiceResult(
         from_station=_FROM_REF,
         to_station=_TO_REF,
@@ -70,9 +70,21 @@ def test_query_returns_not_implemented_for_unbuilt_compose():
             "src.pipeline.orchestrator.next_service.find_next_service",
             new=AsyncMock(return_value=success_result),
         ),
+        patch(
+            "src.pipeline.orchestrator.compose.compose_answer",
+            new=AsyncMock(return_value="Next train departs shortly."),
+        ),
+        patch(
+            "src.pipeline.orchestrator.tts.synthesize",
+            new=AsyncMock(return_value="base64audio"),
+        ),
     ):
         response = client.post("/api/query", content=b"short audio")
-    assert response.status_code == 501
+    assert response.status_code == 200
+    body = response.json()
+    assert body["text"] == "Next train departs shortly."
+    assert body["audio"] == "base64audio"
+    assert body["fallback_reason"] is None
 
 
 def test_query_returns_fallback_for_no_service_today():
