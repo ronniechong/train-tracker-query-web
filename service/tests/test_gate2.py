@@ -93,6 +93,24 @@ async def test_generic_station_word_is_ignored():
     assert result.from_station_id == "flinders"
 
 
+async def test_severe_stt_mishear_of_uncommon_name_still_matches(monkeypatch):
+    # "Mooroolbark" transcribed by Whisper as "Morrowbark" in live testing
+    # (with the STT prompt's help) — regression guard for the threshold
+    # needing to stay low enough to catch this while still excluding
+    # coincidental overlaps between unrelated real stations (see below).
+    mooroolbark = Station(station_id="mooroolbark", name="Mooroolbark Railway Station", routes=[_BELGRAVE])
+
+    async def fake_get_stations():
+        return [*_STATIONS, mooroolbark]
+
+    monkeypatch.setattr("src.pipeline.gate2.get_stations", fake_get_stations)
+    extracted = ExtractedQuery(
+        from_station="Morrowbark", to_station="Richmond", route_hint="Belgrave", time=None
+    )
+    result = await resolve_stations(extracted)
+    assert result.from_station_id == "mooroolbark"
+
+
 async def test_coincidental_fuzzy_overlap_does_not_falsely_match():
     # "Flinders" vs "Richmond" share no words and aren't a plausible STT
     # mishear of each other — regression guard for the bug where

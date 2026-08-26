@@ -12,12 +12,16 @@ _EXTRACTION_MODEL = "openai/gpt-oss-20b"
 # A spoken name that's an exact word-subset of a station's name (e.g.
 # "Flinders" for "Flinders Street") is always a confident match — see
 # _is_word_subset. Anything else falls back to fuzzy scoring, which needs
-# a stricter bar: short station names can coincidentally fuzzy-match each
-# other well above 70 (e.g. "Richmond" vs. "Ormond" scored 71.4, two real
-# but unrelated stations) without being an actual STT mishear. Both
-# pre-committed, revisit once Milestone 03's eval set gives real
+# a bar that separates two failure modes pulling in opposite directions:
+# too low and unrelated real stations coincidentally collide (a live
+# sweep of all 226 real stations found several pairs — e.g. "Armadale"/
+# "Parkdale", "Caulfield"/"Upfield" — scoring exactly 75.0); too high and
+# genuine severe mishears of uncommon names get rejected ("Mooroolbark"
+# transcribed as "Morrowbark" scored 76.2, live-verified via a real STT
+# round-trip). 76 is the gap between those two live-measured clusters.
+# Pre-committed, revisit once Milestone 03's eval set gives real
 # precision/recall data.
-_FUZZY_MISHEAR_THRESHOLD = 80
+_FUZZY_MISHEAR_THRESHOLD = 76
 _ROUTE_HINT_THRESHOLD = 70
 
 # Every station name shares this suffix, which otherwise inflates fuzzy
