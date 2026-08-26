@@ -128,12 +128,14 @@ class ClarificationNeeded(Exception):
         reason: FallbackReason,
         field: str,
         suggested_station_name: str | None = None,
+        options: list[str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
         self.reason = reason
         self.field = field
         self.suggested_station_name = suggested_station_name
+        self.options = options
 
 
 async def extract(transcript: str, span=None) -> ExtractedQuery:
@@ -161,6 +163,15 @@ def _is_confident_match(spoken: str, candidate: str) -> bool:
 
 def _match_candidates(name: str, stations: list[Station]) -> list[Station]:
     normalized_name = _normalize(name)
+    # An exact normalized match always wins outright, even when the same
+    # text would also word-subset-match sibling stations (e.g. "Richmond"
+    # is a subset of "East Richmond" too). Without this, confirming an
+    # exact station name picked from an ambiguous-match list (the "which
+    # one did you mean?" clarification) re-triggers the same ambiguity
+    # instead of resolving.
+    exact = [s for s in stations if _normalize(s.name) == normalized_name]
+    if exact:
+        return exact
     return [s for s in stations if _is_confident_match(normalized_name, _normalize(s.name))]
 
 
@@ -249,12 +260,13 @@ async def _resolve_one(
 
     narrowed = _narrow_by_route_hint(candidates, route_hint)
     if len(narrowed) > 1:
-        options = ", ".join(sorted({s.name for s in narrowed}))
+        option_names = sorted({s.name for s in narrowed})
         raise ClarificationNeeded(
-            f"There are a few stations matching '{spoken_name}' ({options}) — "
-            "which line are you near?",
+            f"There are a few stations matching '{spoken_name}' "
+            f"({', '.join(option_names)}) — which one did you mean?",
             FallbackReason.AMBIGUOUS_STATION,
             field,
+            options=option_names,
         )
 
     return narrowed[0]

@@ -23,6 +23,7 @@ class ExtractedQueryFields(BaseModel):
 class ClarificationInfo(BaseModel):
     field: str  # "from" or "to" — which side needs disambiguation
     suggested_station_name: str | None
+    options: list[str] | None = None  # multiple real candidates (ambiguous match), pick one
     extracted: ExtractedQueryFields  # the original query, to resubmit with a substitution
 
 

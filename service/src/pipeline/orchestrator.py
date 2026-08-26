@@ -62,6 +62,7 @@ async def _run_pipeline_for_extracted(
             clarification=ClarificationInfo(
                 field=exc.field,
                 suggested_station_name=exc.suggested_station_name,
+                options=exc.options,
                 extracted=ExtractedQueryFields(**extracted.model_dump()),
             ),
         )

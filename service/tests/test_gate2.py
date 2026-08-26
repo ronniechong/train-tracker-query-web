@@ -59,16 +59,47 @@ async def test_confident_single_match_resolves():
     assert result.to_station_id == "richmond-belgrave"
 
 
-async def test_ambiguous_name_without_route_hint_raises_clarification():
+async def test_exact_name_match_wins_over_sibling_word_subset_matches():
+    # "Richmond" word-subset-matches "North Richmond" too, but an exact
+    # normalized match should never be treated as ambiguous just because
+    # a sibling station's name happens to contain it as a substring —
+    # this is what makes confirming a disambiguated station name (from
+    # the "which one did you mean?" clarification) actually resolve
+    # instead of looping back into the same ambiguity.
+    extracted = ExtractedQuery(from_station="Flinders Street", to_station="Richmond", route_hint=None, time=None)
+    result = await resolve_stations(extracted)
+    assert result.to_station_id == "richmond-belgrave"
+
+
+async def test_ambiguous_name_without_route_hint_raises_clarification(monkeypatch):
+    east_richmond = Station(
+        station_id="richmond-east", name="East Richmond Railway Station", routes=[_BELGRAVE]
+    )
+
+    async def fake_get_stations():
+        return [_RICHMOND_ALAMEIN, east_richmond, _FLINDERS]
+
+    monkeypatch.setattr("src.pipeline.gate2.get_stations", fake_get_stations)
+
     extracted = ExtractedQuery(from_station="Flinders Street", to_station="Richmond", route_hint=None, time=None)
     with pytest.raises(ClarificationNeeded) as exc_info:
         await resolve_stations(extracted)
     assert exc_info.value.reason is FallbackReason.AMBIGUOUS_STATION
     assert exc_info.value.field == "to"
     assert exc_info.value.suggested_station_name is None
+    assert exc_info.value.options == ["East Richmond Railway Station", "North Richmond Railway Station"]
 
 
-async def test_route_hint_narrows_ambiguous_match():
+async def test_route_hint_narrows_ambiguous_match(monkeypatch):
+    east_richmond = Station(
+        station_id="richmond-east", name="East Richmond Railway Station", routes=[_BELGRAVE]
+    )
+
+    async def fake_get_stations():
+        return [_RICHMOND_ALAMEIN, east_richmond, _FLINDERS]
+
+    monkeypatch.setattr("src.pipeline.gate2.get_stations", fake_get_stations)
+
     extracted = ExtractedQuery(
         from_station="Flinders Street", to_station="Richmond", route_hint="Alamein", time=None
     )

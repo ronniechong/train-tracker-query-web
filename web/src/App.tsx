@@ -15,6 +15,7 @@ interface ExtractedQueryFields {
 interface ClarificationInfo {
   field: string
   suggested_station_name: string | null
+  options: string[] | null
   extracted: ExtractedQueryFields
 }
 
@@ -79,9 +80,9 @@ function App() {
   )
 
   const confirmSuggestion = useCallback(
-    (clarification: ClarificationInfo) => {
+    (clarification: ClarificationInfo, stationName: string) => {
       const field = `${clarification.field}_station`
-      const body = { ...clarification.extracted, [field]: clarification.suggested_station_name }
+      const body = { ...clarification.extracted, [field]: stationName }
       return runQuery('/api/query/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -192,9 +193,27 @@ function App() {
         <div className={`status ${result.fallback_reason ? 'status-fallback' : 'status-answer'}`}>
           <p>{result.text}</p>
           {result.clarification?.suggested_station_name && (
-            <button type="button" onClick={() => void confirmSuggestion(result.clarification!)}>
+            <button
+              type="button"
+              onClick={() =>
+                void confirmSuggestion(result.clarification!, result.clarification!.suggested_station_name!)
+              }
+            >
               Yes, use {result.clarification.suggested_station_name}
             </button>
+          )}
+          {result.clarification?.options && (
+            <div className="clarification-options">
+              {result.clarification.options.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => void confirmSuggestion(result.clarification!, option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
           )}
           <button type="button" onClick={reset}>
             Ask another question

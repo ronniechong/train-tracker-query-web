@@ -2,10 +2,14 @@ import os
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from logging import getLogger
+from typing import TYPE_CHECKING
 
 from langfuse import Langfuse
 
-from .gate2 import ExtractedQuery
+if TYPE_CHECKING:
+    # Only needed for the type hint below; a real (non-TYPE_CHECKING) import
+    # here creates a circular import with gate2, which imports this module.
+    from .gate2 import ExtractedQuery
 
 _logger = getLogger(__name__)
 
@@ -107,7 +111,7 @@ def _get_client() -> Langfuse | None:
     return _client
 
 
-def safe_query_summary(extracted: ExtractedQuery | None, transcript_length: int) -> dict:
+def safe_query_summary(extracted: "ExtractedQuery | None", transcript_length: int) -> dict:
     """Trace input built from structured fields only — never the raw
     transcript. Station names/times are fine to trace; the raw transcript
     can carry incidental PII (a name, a stated habit pattern) so it must
