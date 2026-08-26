@@ -1,5 +1,6 @@
 from . import compose, declines, gate1, gate2, next_service, stt, tts
 from .gate1 import Gate1Outcome
+from .gate2 import ClarificationNeeded
 from .models import FallbackReason, QueryResponse
 
 
@@ -16,8 +17,12 @@ async def run_pipeline_for_transcript(transcript: str) -> QueryResponse:
             fallback_reason=FallbackReason.OFF_TOPIC,
         )
 
-    extracted = gate2.extract(transcript)
-    stations = gate2.resolve_stations(extracted)
+    extracted = await gate2.extract(transcript)
+    try:
+        stations = await gate2.resolve_stations(extracted)
+    except ClarificationNeeded as exc:
+        return QueryResponse(text=exc.message, fallback_reason=exc.reason)
+
     result = next_service.find_next_service(stations, extracted.route_hint)
     answer = compose.compose_answer(result)
     audio = tts.synthesize(answer)

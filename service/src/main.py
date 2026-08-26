@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException, Request
 
 from .pipeline.models import QueryResponse
 from .pipeline.orchestrator import run_pipeline
+from .pipeline.stations_cache import ScheduleUnavailable
 
 load_dotenv()
 
@@ -31,3 +32,5 @@ async def query(request: Request) -> QueryResponse:
         return await run_pipeline(audio_bytes)
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except ScheduleUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc

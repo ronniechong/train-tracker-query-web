@@ -1,0 +1,68 @@
+import pytest
+
+from src.pipeline.gate2 import ClarificationNeeded, ExtractedQuery, resolve_stations
+from src.pipeline.models import FallbackReason
+from src.pipeline.stations_cache import Route, Station
+
+_BELGRAVE = Route(route_id="belgrave", short_name="Belgrave", long_name="Belgrave - City")
+_ALAMEIN = Route(route_id="alamein", short_name="Alamein", long_name="Alamein - City")
+
+_RICHMOND_BELGRAVE = Station(
+    station_id="richmond-belgrave", name="Richmond Railway Station", routes=[_BELGRAVE]
+)
+_RICHMOND_ALAMEIN = Station(
+    station_id="richmond-alamein", name="Richmond (Alamein Line)", routes=[_ALAMEIN]
+)
+_FLINDERS = Station(
+    station_id="flinders", name="Flinders Street Railway Station", routes=[_BELGRAVE, _ALAMEIN]
+)
+
+_STATIONS = [_RICHMOND_BELGRAVE, _RICHMOND_ALAMEIN, _FLINDERS]
+
+
+@pytest.fixture(autouse=True)
+def _mock_stations(monkeypatch):
+    async def fake_get_stations():
+        return _STATIONS
+
+    monkeypatch.setattr("src.pipeline.gate2.get_stations", fake_get_stations)
+
+
+async def test_confident_single_match_resolves():
+    extracted = ExtractedQuery(
+        from_station="Flinders Street", to_station="Richmond", route_hint="Belgrave", time=None
+    )
+    result = await resolve_stations(extracted)
+    assert result.from_station_id == "flinders"
+    assert result.to_station_id == "richmond-belgrave"
+
+
+async def test_ambiguous_name_without_route_hint_raises_clarification():
+    extracted = ExtractedQuery(from_station="Flinders Street", to_station="Richmond", route_hint=None, time=None)
+    with pytest.raises(ClarificationNeeded) as exc_info:
+        await resolve_stations(extracted)
+    assert exc_info.value.reason is FallbackReason.AMBIGUOUS_STATION
+
+
+async def test_route_hint_narrows_ambiguous_match():
+    extracted = ExtractedQuery(
+        from_station="Flinders Street", to_station="Richmond", route_hint="Alamein", time=None
+    )
+    result = await resolve_stations(extracted)
+    assert result.to_station_id == "richmond-alamein"
+
+
+async def test_low_confidence_match_raises_clarification():
+    extracted = ExtractedQuery(
+        from_station="Flinders Street", to_station="Xylophonia", route_hint=None, time=None
+    )
+    with pytest.raises(ClarificationNeeded) as exc_info:
+        await resolve_stations(extracted)
+    assert exc_info.value.reason is FallbackReason.LOW_CONFIDENCE_STATION
+
+
+async def test_missing_station_raises_clarification():
+    extracted = ExtractedQuery(from_station="Flinders Street", to_station=None, route_hint=None, time=None)
+    with pytest.raises(ClarificationNeeded) as exc_info:
+        await resolve_stations(extracted)
+    assert exc_info.value.reason is FallbackReason.LOW_CONFIDENCE_STATION
