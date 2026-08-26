@@ -17,8 +17,10 @@ class Leg(BaseModel):
     route_id: str
     headsign: str
     from_station: StationRef
+    from_platform_code: str | None = None
     departure_time: str
     to_station: StationRef
+    to_platform_code: str | None = None
     arrival_time: str
 
 

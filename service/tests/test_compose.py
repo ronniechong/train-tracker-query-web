@@ -86,3 +86,22 @@ async def test_answer_never_exceeds_character_budget(monkeypatch):
     _mock_client(monkeypatch, "Next train to Flinders Street leaves Richmond at 1:08 PM.")
     answer = await compose.compose_answer(_RESULT)
     assert len(answer) <= compose._CHARACTER_BUDGET
+
+
+async def test_facts_include_platform_when_present():
+    result = _RESULT.model_copy(deep=True)
+    result.legs[0].from_platform_code = "8"
+    facts = compose._facts(result)
+    assert "platform 8" in facts
+
+
+async def test_facts_omit_platform_when_absent():
+    facts = compose._facts(_RESULT)
+    assert "platform" not in facts
+
+
+async def test_fallback_answer_includes_platform_when_present():
+    result = _RESULT.model_copy(deep=True)
+    result.legs[0].from_platform_code = "8"
+    answer = compose._fallback_answer(result)
+    assert "platform 8" in answer

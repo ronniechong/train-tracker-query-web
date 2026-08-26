@@ -15,8 +15,12 @@ _CHARACTER_BUDGET = 150
 _SYSTEM_PROMPT = (
     "You compose short, spoken-friendly answers for a Melbourne train "
     "schedule voice assistant. Use only the facts given — never invent "
-    "times, stations, or lines. One or two short sentences, natural "
-    f"spoken phrasing, no markdown. Stay under {_CHARACTER_BUDGET} characters."
+    "times, stations, lines, or platforms. Include the departure platform "
+    "when one is given, but only if it fits naturally without crowding "
+    "out the times — a platform number is more useful than a repeated "
+    "detail, but time and destination always come first. One or two "
+    "short sentences, natural spoken phrasing, no markdown. Stay under "
+    f"{_CHARACTER_BUDGET} characters."
 )
 
 _client: AsyncGroq | None = None
@@ -37,9 +41,10 @@ def _local_time(iso_timestamp: str) -> str:
 def _facts(result: NextServiceResult) -> str:
     lines = []
     for i, leg in enumerate(result.legs, start=1):
+        platform = f", platform {leg.from_platform_code}" if leg.from_platform_code else ""
         lines.append(
-            f"Leg {i}: depart {leg.from_station.name} at {_local_time(leg.departure_time)}, "
-            f"arrive {leg.to_station.name} at {_local_time(leg.arrival_time)}, "
+            f"Leg {i}: depart {leg.from_station.name} at {_local_time(leg.departure_time)}"
+            f"{platform}, arrive {leg.to_station.name} at {_local_time(leg.arrival_time)}, "
             f"towards {leg.headsign}."
         )
     return "\n".join(lines)
@@ -47,9 +52,10 @@ def _facts(result: NextServiceResult) -> str:
 
 def _fallback_answer(result: NextServiceResult) -> str:
     leg = result.legs[0]
+    platform = f", platform {leg.from_platform_code}" if leg.from_platform_code else ""
     answer = (
         f"Next train from {result.from_station.name} to {result.to_station.name} "
-        f"departs at {_local_time(leg.departure_time)}."
+        f"departs at {_local_time(leg.departure_time)}{platform}."
     )
     return answer[:_CHARACTER_BUDGET]
 
