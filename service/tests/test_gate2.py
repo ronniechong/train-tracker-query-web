@@ -69,3 +69,36 @@ async def test_missing_station_raises_clarification():
     with pytest.raises(ClarificationNeeded) as exc_info:
         await resolve_stations(extracted)
     assert exc_info.value.reason is FallbackReason.LOW_CONFIDENCE_STATION
+
+
+async def test_bare_partial_name_matches_full_station_name():
+    extracted = ExtractedQuery(from_station="Flinders", to_station="Richmond", route_hint="Belgrave", time=None)
+    result = await resolve_stations(extracted)
+    assert result.from_station_id == "flinders"
+
+
+async def test_matching_is_case_insensitive():
+    extracted = ExtractedQuery(
+        from_station="flinders street", to_station="richmond", route_hint="belgrave", time=None
+    )
+    result = await resolve_stations(extracted)
+    assert result.from_station_id == "flinders"
+
+
+async def test_generic_station_word_is_ignored():
+    extracted = ExtractedQuery(
+        from_station="Flinders station", to_station="Richmond", route_hint="Belgrave", time=None
+    )
+    result = await resolve_stations(extracted)
+    assert result.from_station_id == "flinders"
+
+
+async def test_coincidental_fuzzy_overlap_does_not_falsely_match():
+    # "Flinders" vs "Richmond" share no words and aren't a plausible STT
+    # mishear of each other — regression guard for the bug where
+    # lowercasing before scoring pushed some unrelated station-name pairs
+    # (e.g. real stations "Richmond"/"Ormond") above the match threshold.
+    extracted = ExtractedQuery(from_station="Ormond", to_station="Flinders", route_hint=None, time=None)
+    with pytest.raises(ClarificationNeeded) as exc_info:
+        await resolve_stations(extracted)
+    assert exc_info.value.reason is FallbackReason.LOW_CONFIDENCE_STATION
