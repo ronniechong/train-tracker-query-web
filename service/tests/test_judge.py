@@ -53,6 +53,15 @@ async def test_overall_pass_requires_all_three():
     assert verdict.overall_pass is True
 
 
+def test_prompt_tells_judge_time_field_is_a_lower_bound():
+    # Live-verified regression (2026-08-27): a correct answer with
+    # departure 18:22 was marked accuracy_pass=False against an
+    # expected_fields.time of 18:15 - the judge treated it as an exact
+    # expected departure rather than the "next train at or after this
+    # time" filter it actually is.
+    assert "AT OR AFTER" in judge._JUDGE_SYSTEM_PROMPT
+
+
 def test_prompt_tells_judge_schedule_details_are_not_expected_fields():
     # Live-verified regression (2026-08-27): a correct answer including a
     # real departure time and platform (from a live schedule lookup) was
