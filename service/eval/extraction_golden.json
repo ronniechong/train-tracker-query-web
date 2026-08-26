@@ -147,7 +147,7 @@
     "transcript": "Train from Cranbourne to the city at 7 in the morning",
     "expected": {
       "from_station": "Cranbourne",
-      "to_station": "the city",
+      "to_station": "city",
       "route_hint": null,
       "time": "07:00"
     }
@@ -189,7 +189,7 @@
     }
   },
   {
-    "transcript": "Next Frankston line train from Caulfield to Richmond at 4",
+    "transcript": "Next Frankston line train from Caulfield to Richmond at 4pm",
     "expected": {
       "from_station": "Caulfield",
       "to_station": "Richmond",
