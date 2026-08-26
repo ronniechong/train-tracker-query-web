@@ -1,6 +1,9 @@
 from groq import AsyncGroq
 
+from . import tracing
+
 _client: AsyncGroq | None = None
+_MODEL = "whisper-large-v3-turbo"
 
 # Whisper's prompt biases transcription toward listed vocabulary, but
 # only actually helps up to a point — a full ~900-character list of
@@ -27,10 +30,11 @@ def _get_client() -> AsyncGroq:
     return _client
 
 
-async def transcribe(audio_bytes: bytes) -> str:
+async def transcribe(audio_bytes: bytes, span=None) -> str:
     transcription = await _get_client().audio.transcriptions.create(
-        model="whisper-large-v3-turbo",
+        model=_MODEL,
         file=("audio.webm", audio_bytes, "audio/webm"),
         prompt=_STATION_NAME_PROMPT,
     )
+    tracing.record_cost(span, _MODEL, tracing.stt_cost_usd())
     return transcription.text

@@ -4,6 +4,7 @@ from groq import AsyncGroq
 from pydantic import BaseModel
 from rapidfuzz import fuzz
 
+from . import tracing
 from .models import FallbackReason
 from .stations_cache import Station, get_stations
 
@@ -135,7 +136,7 @@ class ClarificationNeeded(Exception):
         self.suggested_station_name = suggested_station_name
 
 
-async def extract(transcript: str) -> ExtractedQuery:
+async def extract(transcript: str, span=None) -> ExtractedQuery:
     response = await _get_client().chat.completions.create(
         model=_EXTRACTION_MODEL,
         temperature=0,
@@ -148,6 +149,7 @@ async def extract(transcript: str) -> ExtractedQuery:
             "json_schema": {"name": "extraction", "schema": _EXTRACTION_SCHEMA, "strict": True},
         },
     )
+    tracing.record_chat_cost(span, _EXTRACTION_MODEL, response)
     return ExtractedQuery.model_validate_json(response.choices[0].message.content)
 
 
@@ -188,7 +190,7 @@ def _top_candidates(spoken_name: str, stations: list[Station]) -> list[Station]:
     return ranked[:_SUGGESTION_CANDIDATE_COUNT]
 
 
-async def _suggest_closest_station(spoken_name: str, stations: list[Station]) -> Station | None:
+async def _suggest_closest_station(spoken_name: str, stations: list[Station], span=None) -> Station | None:
     candidates = _top_candidates(spoken_name, stations)
     by_name = {s.name: s for s in candidates}
     schema = {
@@ -214,12 +216,13 @@ async def _suggest_closest_station(spoken_name: str, stations: list[Station]) ->
             "json_schema": {"name": "suggestion", "schema": schema, "strict": True},
         },
     )
+    tracing.record_chat_cost(span, _SUGGESTION_MODEL, response)
     guess = json.loads(response.choices[0].message.content)["best_guess"]
     return by_name.get(guess)
 
 
 async def _resolve_one(
-    field: str, spoken_name: str | None, stations: list[Station], route_hint: str | None
+    field: str, spoken_name: str | None, stations: list[Station], route_hint: str | None, span=None
 ) -> Station:
     if spoken_name is None:
         raise ClarificationNeeded(
@@ -230,7 +233,7 @@ async def _resolve_one(
 
     candidates = _match_candidates(spoken_name, stations)
     if not candidates:
-        suggestion = await _suggest_closest_station(spoken_name, stations)
+        suggestion = await _suggest_closest_station(spoken_name, stations, span=span)
         if suggestion is not None:
             raise ClarificationNeeded(
                 f"I heard '{spoken_name}' — did you mean {suggestion.name}?",
@@ -257,10 +260,14 @@ async def _resolve_one(
     return narrowed[0]
 
 
-async def resolve_stations(extracted: ExtractedQuery) -> ResolvedStations:
+async def resolve_stations(extracted: ExtractedQuery, span=None) -> ResolvedStations:
     stations = await get_stations()
-    from_station = await _resolve_one("from", extracted.from_station, stations, extracted.route_hint)
-    to_station = await _resolve_one("to", extracted.to_station, stations, extracted.route_hint)
+    from_station = await _resolve_one(
+        "from", extracted.from_station, stations, extracted.route_hint, span=span
+    )
+    to_station = await _resolve_one(
+        "to", extracted.to_station, stations, extracted.route_hint, span=span
+    )
     return ResolvedStations(
         from_station_id=from_station.station_id,
         from_station_name=from_station.name,

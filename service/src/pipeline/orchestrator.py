@@ -1,4 +1,4 @@
-from . import compose, declines, gate1, gate2, next_service, stt, tts
+from . import compose, declines, gate1, gate2, next_service, stt, tracing, tts
 from .gate1 import Gate1Outcome
 from .gate2 import ClarificationNeeded, ExtractedQuery
 from .models import ClarificationInfo, ExtractedQueryFields, FallbackReason, QueryResponse
@@ -8,34 +8,54 @@ _PTV_JOURNEY_PLANNER_URL = "https://www.ptv.vic.gov.au/journey"
 
 
 async def run_pipeline(audio_bytes: bytes) -> QueryResponse:
-    transcript = await stt.transcribe(audio_bytes)
-    return await run_pipeline_for_transcript(transcript)
+    with tracing.trace_query(len(audio_bytes)) as (trace_span, update_trace):
+        with tracing.stage_span("stt") as span:
+            transcript = await stt.transcribe(audio_bytes, span=span)
+        return await _run_pipeline_for_transcript(transcript, trace_span, update_trace)
 
 
 async def run_pipeline_for_transcript(transcript: str) -> QueryResponse:
-    gate1_outcome = await gate1.check(transcript)
+    with tracing.trace_query(len(transcript)) as (trace_span, update_trace):
+        return await _run_pipeline_for_transcript(transcript, trace_span, update_trace)
+
+
+async def _run_pipeline_for_transcript(transcript: str, trace_span, update_trace) -> QueryResponse:
+    with tracing.stage_span("gate1") as span:
+        gate1_outcome = await gate1.check(transcript, span=span)
     if gate1_outcome is not Gate1Outcome.PASS:
+        update_trace(output={"fallback_reason": FallbackReason.OFF_TOPIC})
         return QueryResponse(
             text=declines.random_decline(),
             fallback_reason=FallbackReason.OFF_TOPIC,
         )
 
-    extracted = await gate2.extract(transcript)
-    return await _run_pipeline_for_extracted(extracted)
+    with tracing.stage_span("gate2-extract") as span:
+        extracted = await gate2.extract(transcript, span=span)
+    # Only structured fields ever reach the trace — never the raw
+    # transcript, which can carry incidental PII (a name, a stated habit
+    # pattern) even though the query itself is just station names/times.
+    update_trace(input=tracing.safe_query_summary(extracted, len(transcript)))
+    return await _run_pipeline_for_extracted(extracted, trace_span, update_trace)
 
 
 async def run_pipeline_for_confirmed(extracted: ExtractedQuery) -> QueryResponse:
-    # Gate 1 already passed for the original query this extraction came
-    # from (a clarification only ever follows a passed Gate 1) — this is
-    # the user confirming a suggested station, not new untrusted text, so
-    # re-running Gate 1 here would be redundant, not a safety gap.
-    return await _run_pipeline_for_extracted(extracted)
+    with tracing.trace_query(0) as (trace_span, update_trace):
+        update_trace(input=tracing.safe_query_summary(extracted, 0))
+        # Gate 1 already passed for the original query this extraction came
+        # from (a clarification only ever follows a passed Gate 1) — this is
+        # the user confirming a suggested station, not new untrusted text, so
+        # re-running Gate 1 here would be redundant, not a safety gap.
+        return await _run_pipeline_for_extracted(extracted, trace_span, update_trace)
 
 
-async def _run_pipeline_for_extracted(extracted: ExtractedQuery) -> QueryResponse:
+async def _run_pipeline_for_extracted(
+    extracted: ExtractedQuery, trace_span, update_trace
+) -> QueryResponse:
     try:
-        stations = await gate2.resolve_stations(extracted)
+        with tracing.stage_span("gate2-resolve") as span:
+            stations = await gate2.resolve_stations(extracted, span=span)
     except ClarificationNeeded as exc:
+        update_trace(output={"fallback_reason": exc.reason})
         return QueryResponse(
             text=exc.message,
             fallback_reason=exc.reason,
@@ -49,9 +69,11 @@ async def _run_pipeline_for_extracted(extracted: ExtractedQuery) -> QueryRespons
     try:
         result = await next_service.find_next_service(stations, requested_time=extracted.time)
     except UnknownStation as exc:
+        update_trace(output={"fallback_reason": FallbackReason.UNKNOWN_STATION})
         return QueryResponse(text=str(exc), fallback_reason=FallbackReason.UNKNOWN_STATION)
 
     if result.reason == "no_service_today":
+        update_trace(output={"fallback_reason": FallbackReason.NO_SERVICE_TODAY})
         return QueryResponse(
             text=(
                 f"There's no service running today between "
@@ -60,6 +82,7 @@ async def _run_pipeline_for_extracted(extracted: ExtractedQuery) -> QueryRespons
             fallback_reason=FallbackReason.NO_SERVICE_TODAY,
         )
     if result.reason == "no_route_found":
+        update_trace(output={"fallback_reason": FallbackReason.NO_ROUTE_FOUND})
         return QueryResponse(
             text=(
                 f"I can't find a direct or single-transfer route between "
@@ -69,6 +92,15 @@ async def _run_pipeline_for_extracted(extracted: ExtractedQuery) -> QueryRespons
             fallback_reason=FallbackReason.NO_ROUTE_FOUND,
         )
 
-    answer = await compose.compose_answer(result)
-    audio = await tts.synthesize(answer)
+    with tracing.stage_span("compose") as span:
+        answer = await compose.compose_answer(result, span=span)
+
+    # Cheapest lever when over the daily spend cap (addendum-02 Note B):
+    # skip TTS, still return the text answer rather than failing the query.
+    audio = None
+    if not tracing.is_over_daily_cap():
+        with tracing.stage_span("tts") as span:
+            audio = await tts.synthesize(answer, span=span)
+
+    update_trace(output={"text": answer})
     return QueryResponse(text=answer, audio=audio)

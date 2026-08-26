@@ -181,13 +181,13 @@ def test_query_clarification_includes_structured_suggestion(monkeypatch):
     from src.pipeline.gate2 import ClarificationNeeded
     from src.pipeline.models import FallbackReason
 
-    async def fake_transcribe(audio_bytes):
+    async def fake_transcribe(audio_bytes, **_kwargs):
         return "when's the next train from Murubak to Richmond"
 
-    async def fake_extract(transcript):
+    async def fake_extract(transcript, **_kwargs):
         return ExtractedQuery(from_station="Murubak", to_station="Richmond", route_hint=None, time=None)
 
-    async def fake_resolve_stations(extracted):
+    async def fake_resolve_stations(extracted, **_kwargs):
         raise ClarificationNeeded(
             "I heard 'Murubak' — did you mean Mooroolbark Railway Station?",
             FallbackReason.LOW_CONFIDENCE_STATION,

@@ -2,6 +2,8 @@ import base64
 
 from groq import AsyncGroq
 
+from . import tracing
+
 _TTS_MODEL = "canopylabs/orpheus-v1-english"
 _VOICE = "autumn"
 
@@ -19,7 +21,7 @@ def _get_client() -> AsyncGroq:
     return _client
 
 
-async def synthesize(text: str) -> str:
+async def synthesize(text: str, span=None) -> str:
     response = await _get_client().audio.speech.create(
         input=text,
         model=_TTS_MODEL,
@@ -27,4 +29,5 @@ async def synthesize(text: str) -> str:
         response_format=_RESPONSE_FORMAT,
     )
     audio_bytes = await response.read()
+    tracing.record_cost(span, _TTS_MODEL, tracing.tts_cost_usd(len(text)))
     return base64.b64encode(audio_bytes).decode("ascii")

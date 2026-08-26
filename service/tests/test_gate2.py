@@ -44,7 +44,7 @@ def _no_llm_suggestion_by_default(monkeypatch):
     # Every no-match case now consults an LLM suggestion step (see
     # test_llm_suggestion_*) — default it to "no suggestion" so tests
     # that don't care about that behaviour don't make a live call.
-    async def fake_suggest(spoken_name, stations):
+    async def fake_suggest(spoken_name, stations, **_kwargs):
         return None
 
     monkeypatch.setattr("src.pipeline.gate2._suggest_closest_station", fake_suggest)
@@ -148,7 +148,7 @@ async def test_llm_suggestion_offered_as_did_you_mean(monkeypatch):
     # like "Murubak" for "Mooroolbark", too mangled for any fuzzy
     # threshold), an LLM fallback may suggest a station — but only ever
     # as a question the user must confirm, never a silent resolution.
-    async def fake_suggest(spoken_name, stations):
+    async def fake_suggest(spoken_name, stations, **_kwargs):
         return _FLINDERS
 
     monkeypatch.setattr("src.pipeline.gate2._suggest_closest_station", fake_suggest)

@@ -3,6 +3,8 @@ from enum import StrEnum
 
 from groq import AsyncGroq
 
+from . import tracing
+
 _INJECTION_GUARD_MODEL = "meta-llama/llama-prompt-guard-2-86m"
 _RELEVANCE_MODEL = "openai/gpt-oss-20b"
 _INJECTION_SCORE_THRESHOLD = 0.5
@@ -37,13 +39,14 @@ class Gate1Outcome(StrEnum):
     OFF_TOPIC = "off_topic"
 
 
-async def check(transcript: str) -> Gate1Outcome:
+async def check(transcript: str, span=None) -> Gate1Outcome:
     client = _get_client()
 
     guard = await client.chat.completions.create(
         model=_INJECTION_GUARD_MODEL,
         messages=[{"role": "user", "content": transcript}],
     )
+    tracing.record_chat_cost(span, _INJECTION_GUARD_MODEL, guard)
     if float(guard.choices[0].message.content) > _INJECTION_SCORE_THRESHOLD:
         return Gate1Outcome.INJECTION_BLOCKED
 
@@ -59,6 +62,7 @@ async def check(transcript: str) -> Gate1Outcome:
             "json_schema": {"name": "relevance", "schema": _RELEVANCE_SCHEMA, "strict": True},
         },
     )
+    tracing.record_chat_cost(span, _RELEVANCE_MODEL, relevance)
     label = json.loads(relevance.choices[0].message.content)["label"]
     if label == "OFF_TOPIC":
         return Gate1Outcome.OFF_TOPIC

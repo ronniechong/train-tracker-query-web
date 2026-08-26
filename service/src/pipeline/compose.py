@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 from groq import AsyncGroq
 
+from . import tracing
 from .next_service import NextServiceResult
 
 _COMPOSITION_MODEL = "openai/gpt-oss-20b"
@@ -85,7 +86,7 @@ def _fallback_answer(result: NextServiceResult) -> str:
     return answer[:_CHARACTER_BUDGET]
 
 
-async def compose_answer(result: NextServiceResult) -> str:
+async def compose_answer(result: NextServiceResult, span=None) -> str:
     response = await _get_client().chat.completions.create(
         model=_COMPOSITION_MODEL,
         temperature=0.3,
@@ -94,6 +95,7 @@ async def compose_answer(result: NextServiceResult) -> str:
             {"role": "user", "content": _facts(result)},
         ],
     )
+    tracing.record_chat_cost(span, _COMPOSITION_MODEL, response)
     answer = (response.choices[0].message.content or "").strip()
     if not answer or len(answer) > _CHARACTER_BUDGET:
         return _fallback_answer(result)
