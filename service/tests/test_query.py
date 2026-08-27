@@ -357,3 +357,41 @@ def test_query_text_is_rate_limited_after_ten_per_minute():
         assert response.status_code == 429
     finally:
         limiter.reset()
+
+
+def test_query_text_rate_limit_keys_on_x_real_ip_not_socket_peer():
+    from src.main import limiter
+    from src.pipeline.gate1 import Gate1Outcome
+
+    limiter.reset()
+    try:
+        with patch(
+            "src.pipeline.orchestrator.gate1.check",
+            new=AsyncMock(return_value=Gate1Outcome.OFF_TOPIC),
+        ):
+            for _ in range(10):
+                response = client.post(
+                    "/api/query/text",
+                    json={"text": "x"},
+                    headers={"X-Real-IP": "203.0.113.1"},
+                )
+                assert response.status_code != 429
+            exhausted = client.post(
+                "/api/query/text",
+                json={"text": "x"},
+                headers={"X-Real-IP": "203.0.113.1"},
+            )
+            assert exhausted.status_code == 429
+
+            # A different X-Real-IP gets its own bucket even though the
+            # TestClient's raw socket peer is identical for both requests —
+            # this is the whole point of trusting Caddy's header over
+            # get_remote_address's raw-peer default.
+            other_ip = client.post(
+                "/api/query/text",
+                json={"text": "x"},
+                headers={"X-Real-IP": "203.0.113.2"},
+            )
+            assert other_ip.status_code != 429
+    finally:
+        limiter.reset()

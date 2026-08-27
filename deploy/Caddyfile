@@ -31,7 +31,12 @@
 
 	@api path /api/* /health
 	handle @api {
-		reverse_proxy service:8000
+		# {http.request.remote.host} is Caddy's own trusted-proxy-resolved
+		# client IP, not a raw forwarded header — safe to pass through
+		# regardless of how X-Forwarded-For accumulates hops downstream.
+		reverse_proxy service:8000 {
+			header_up X-Real-IP {http.request.remote.host}
+		}
 	}
 
 	handle {

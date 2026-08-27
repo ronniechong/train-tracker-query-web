@@ -12,9 +12,11 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-    # No egress needed yet — this skeleton has no outbound calls (no
-    # train-tracker API calls, no AI provider calls until a later
-    # milestone). Internal-only network, no published ports.
+    env_file:
+      - ../service/.env
+    # Outbound to train-tracker's public API and the Groq/Langfuse
+    # providers named in service/.env — no published ports, only
+    # reachable from `caddy` on the internal network.
     networks:
       - ingress
 

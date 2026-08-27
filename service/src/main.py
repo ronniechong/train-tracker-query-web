@@ -21,7 +21,17 @@ MAX_TEXT_LENGTH = 500
 # app has no auth, so per-IP is the only identity available).
 _QUERY_RATE_LIMIT = "10/minute"
 
-limiter = Limiter(key_func=get_remote_address)
+
+def _client_ip(request: Request) -> str:
+    # In production this container only ever receives traffic from Caddy
+    # on an internal-only network, which sets X-Real-IP to its own
+    # trusted-proxy-resolved client address (see deploy/Caddyfile) — the
+    # raw socket peer would otherwise be Caddy itself for every request,
+    # collapsing rate limiting to one shared bucket for all users.
+    return request.headers.get("X-Real-IP") or get_remote_address(request)
+
+
+limiter = Limiter(key_func=_client_ip)
 
 app = FastAPI(title="train-tracker-query-web")
 app.state.limiter = limiter
