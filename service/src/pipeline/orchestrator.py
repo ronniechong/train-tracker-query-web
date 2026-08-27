@@ -1,9 +1,13 @@
+import logging
+
 from . import compose, declines, gate1, gate2, next_service, stt, tracing, tts
 from .errors import UpstreamUnavailable
 from .gate1 import Gate1Outcome
 from .gate2 import ClarificationNeeded, ExtractedQuery
 from .models import ClarificationInfo, ExtractedQueryFields, FallbackReason, QueryResponse
 from .next_service import UnknownStation
+
+_logger = logging.getLogger(__name__)
 
 _PTV_JOURNEY_PLANNER_URL = "https://www.ptv.vic.gov.au/journey"
 
@@ -24,13 +28,15 @@ def _service_unavailable_response() -> QueryResponse:
 
 async def run_pipeline(audio_bytes: bytes) -> QueryResponse:
     if tracing.is_over_daily_cap():
+        _logger.warning("Query denied: over daily Groq spend cap")
         return _service_unavailable_response()
     with tracing.trace_query(len(audio_bytes)) as (trace_span, update_trace, trace_id):
         try:
             with tracing.stage_span("stt") as span:
                 transcript = await stt.transcribe(audio_bytes, span=span)
             response = await _run_pipeline_for_transcript(transcript, trace_span, update_trace)
-        except UpstreamUnavailable:
+        except UpstreamUnavailable as exc:
+            _logger.error("Query failed: %s", exc)
             update_trace(output={"fallback_reason": FallbackReason.SERVICE_UNAVAILABLE})
             return _service_unavailable_response()
         response.trace_id = trace_id
@@ -39,11 +45,13 @@ async def run_pipeline(audio_bytes: bytes) -> QueryResponse:
 
 async def run_pipeline_for_transcript(transcript: str) -> QueryResponse:
     if tracing.is_over_daily_cap():
+        _logger.warning("Query denied: over daily Groq spend cap")
         return _service_unavailable_response()
     with tracing.trace_query(len(transcript)) as (trace_span, update_trace, trace_id):
         try:
             response = await _run_pipeline_for_transcript(transcript, trace_span, update_trace)
-        except UpstreamUnavailable:
+        except UpstreamUnavailable as exc:
+            _logger.error("Query failed: %s", exc)
             update_trace(output={"fallback_reason": FallbackReason.SERVICE_UNAVAILABLE})
             return _service_unavailable_response()
         response.trace_id = trace_id
@@ -71,6 +79,7 @@ async def _run_pipeline_for_transcript(transcript: str, trace_span, update_trace
 
 async def run_pipeline_for_confirmed(extracted: ExtractedQuery) -> QueryResponse:
     if tracing.is_over_daily_cap():
+        _logger.warning("Query denied: over daily Groq spend cap")
         return _service_unavailable_response()
     with tracing.trace_query(0) as (trace_span, update_trace, trace_id):
         update_trace(input=tracing.safe_query_summary(extracted, 0))
@@ -80,7 +89,8 @@ async def run_pipeline_for_confirmed(extracted: ExtractedQuery) -> QueryResponse
         # re-running Gate 1 here would be redundant, not a safety gap.
         try:
             response = await _run_pipeline_for_extracted(extracted, trace_span, update_trace)
-        except UpstreamUnavailable:
+        except UpstreamUnavailable as exc:
+            _logger.error("Query failed: %s", exc)
             update_trace(output={"fallback_reason": FallbackReason.SERVICE_UNAVAILABLE})
             return _service_unavailable_response()
         response.trace_id = trace_id
@@ -145,7 +155,8 @@ async def _run_pipeline_for_extracted(
         try:
             with tracing.stage_span("tts") as span:
                 audio = await tts.synthesize(answer, span=span)
-        except UpstreamUnavailable:
+        except UpstreamUnavailable as exc:
+            _logger.warning("TTS request failed, degrading to text-only: %s", exc)
             audio = None
 
     update_trace(output={"text": answer})
