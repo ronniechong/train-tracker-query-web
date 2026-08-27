@@ -20,6 +20,18 @@ cd service && uv sync && uv run uvicorn src.main:app --reload
 cd web && npm install && npm run dev
 ```
 
+## Testing
+
+`uv run pytest` runs the unit test suite (no external calls). The eval
+suite (`tests/test_eval_harness.py`) hits live Groq and train-tracker
+APIs to check extraction accuracy, station-matching robustness, and
+answer-quality grading against curated fixtures in `eval/`. It's marked
+`eval` and excluded by default — run it on demand:
+
+```
+cd service && uv run pytest -m eval -v
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

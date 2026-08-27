@@ -30,3 +30,7 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "auto"
+addopts = "-m 'not eval'"
+markers = [
+    "eval: hits live Groq + train-tracker APIs (extraction/mishear/end-to-end/judge sets) - run on demand only, e.g. `pytest -m eval`",
+]
