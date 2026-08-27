@@ -7,6 +7,11 @@ from . import tracing
 
 _JUDGE_MODEL = "openai/gpt-oss-20b"
 
+# Bump whenever _JUDGE_SYSTEM_PROMPT's grading criteria change - a rubric
+# revision invalidates any prior judge-vs-manual agreement measurement,
+# since that measurement was only ever a check on this exact wording.
+_RUBRIC_VERSION = 3  # v1: initial; v2: schedule-details fix; v3: time-lower-bound fix
+
 # The judge is never shown the original spoken transcript - only the
 # expected outcome and the assistant's actual response - matching the
 # same fields-only scoping the eval sets and Langfuse tracing use (see

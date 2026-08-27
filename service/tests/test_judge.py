@@ -53,6 +53,11 @@ async def test_overall_pass_requires_all_three():
     assert verdict.overall_pass is True
 
 
+def test_rubric_is_versioned():
+    assert isinstance(judge._RUBRIC_VERSION, int)
+    assert judge._RUBRIC_VERSION >= 1
+
+
 def test_prompt_tells_judge_time_field_is_a_lower_bound():
     # Live-verified regression (2026-08-27): a correct answer with
     # departure 18:22 was marked accuracy_pass=False against an
