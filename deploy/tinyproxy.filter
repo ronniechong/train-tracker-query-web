@@ -1,0 +1,10 @@
+# Allowlist ONLY these hosts. One host per line, matched as an FQDN
+# (see tinyproxy.conf: FilterExtended On).
+# train-tracker's own tailnet-only API is deliberately NOT here — it isn't
+# reachable through this proxy at all (no route to the tailnet from this
+# network); that call goes via the tailscale sidecar's own proxy instead.
+# 1. Groq API -- STT/gates/composition/TTS.
+^api\.groq\.com$
+# 2. Langfuse Cloud -- matches the actual configured LANGFUSE_BASE_URL
+# value, not assumed.
+^cloud\.langfuse\.com$

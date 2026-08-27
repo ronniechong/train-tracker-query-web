@@ -32,13 +32,21 @@ def _base_url() -> str:
     return base_url.rstrip("/")
 
 
+def _client() -> httpx.AsyncClient:
+    # trust_env=False: this call must never pick up HTTP_PROXY/HTTPS_PROXY
+    # (the Groq/Langfuse egress-proxy, which can't route to train-tracker's
+    # tailnet-only API at all). TRAIN_TRACKER_PROXY_URL, when set, is the
+    # tailscale sidecar's own proxy instead — see deploy/docker-compose.yml.
+    return httpx.AsyncClient(proxy=os.environ.get("TRAIN_TRACKER_PROXY_URL") or None, trust_env=False)
+
+
 async def get_stations() -> list[Station]:
     global _cached_stations, _cached_at
 
     if _cached_stations is not None and time.monotonic() - _cached_at < _CACHE_TTL_SECONDS:
         return _cached_stations
 
-    async with httpx.AsyncClient() as client:
+    async with _client() as client:
         response = await client.get(f"{_base_url()}/api/stations")
 
     if response.status_code == 503:

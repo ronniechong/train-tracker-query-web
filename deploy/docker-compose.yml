@@ -4,6 +4,22 @@
 name: train-tracker-query-web
 
 services:
+  # `service` has no route to the internet except through this proxy
+  # (see the `ingress` network below — internal, no NAT). Only Groq and
+  # Langfuse are allowlisted; train-tracker's API is tailnet-only and
+  # reachable through the `tailscale` sidecar's own proxy instead, not
+  # through this one.
+  egress-proxy:
+    image: docker.io/vimagick/tinyproxy:latest@sha256:72b441b95ee1e641af948f68f09492f9f795ead72b73954414e339168c98ad8c
+    restart: unless-stopped
+    read_only: true
+    volumes:
+      - ./tinyproxy.conf:/etc/tinyproxy/tinyproxy.conf:ro
+      - ./tinyproxy.filter:/etc/tinyproxy/tinyproxy.filter:ro
+    networks:
+      - ingress
+      - egress
+
   service:
     build:
       context: ../service
@@ -14,9 +30,24 @@ services:
       - /tmp
     env_file:
       - ../service/.env
-    # Outbound to train-tracker's public API and the Groq/Langfuse
-    # providers named in service/.env — no published ports, only
-    # reachable from `caddy` on the internal network.
+    environment:
+      HTTP_PROXY: http://egress-proxy:8888
+      HTTPS_PROXY: http://egress-proxy:8888
+      # Loopback exempted so in-container tooling can reach localhost
+      # without punching a new egress-allowlist hole.
+      NO_PROXY: "localhost,127.0.0.1"
+      # tailscaled's own outbound proxy (see deploy/tailscale-entrypoint.sh),
+      # reachable via `caddy` since `tailscale` shares its network
+      # namespace — the only path to a tailnet-only host like
+      # train-tracker's API. Deliberately separate from HTTP(S)_PROXY
+      # above: next_service.py/stations_cache.py must use this one
+      # explicitly (trust_env=False) rather than inherit the Groq/Langfuse
+      # proxy, which can't route to the tailnet at all.
+      TRAIN_TRACKER_PROXY_URL: http://caddy:1055
+    # No published ports — only reachable from `caddy` on the internal
+    # network. All outbound egress goes through egress-proxy (Groq/
+    # Langfuse, allowlisted) or the tailscale sidecar's proxy
+    # (train-tracker's tailnet-only API), never directly.
     networks:
       - ingress
 
@@ -75,14 +106,19 @@ services:
       - caddy
 
 networks:
-  # No real outbound route among this project's own networks — `service`
-  # and `web` only ever accept inbound from `caddy`, never initiate
-  # anything themselves at this stage.
+  # No real outbound route on this network at all — Docker gives it no
+  # NAT, not just a firewall rule that could be misconfigured. `service`
+  # and `web` only ever accept inbound from `caddy`, and reach
+  # `egress-proxy`/`caddy`'s proxy ports for anything outbound.
   ingress:
     internal: true
-  # The only network with a real outbound route — exists for the
-  # `tailscale` sidecar's own traffic, inherited via `network_mode` on the
-  # `caddy` service it shares a namespace with.
+  # egress-proxy's only real outbound route — nothing else is a member.
+  egress:
+    driver: bridge
+  # The only network with a real outbound route among `caddy`'s own
+  # memberships — exists for the `tailscale` sidecar's own traffic,
+  # inherited via `network_mode` on the `caddy` service it shares a
+  # namespace with.
   public:
     driver: bridge
 

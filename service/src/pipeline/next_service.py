@@ -44,6 +44,14 @@ def _base_url() -> str:
     return os.environ["TRAIN_TRACKER_API_BASE_URL"].rstrip("/")
 
 
+def _client() -> httpx.AsyncClient:
+    # trust_env=False: this call must never pick up HTTP_PROXY/HTTPS_PROXY
+    # (the Groq/Langfuse egress-proxy, which can't route to train-tracker's
+    # tailnet-only API at all). TRAIN_TRACKER_PROXY_URL, when set, is the
+    # tailscale sidecar's own proxy instead — see deploy/docker-compose.yml.
+    return httpx.AsyncClient(proxy=os.environ.get("TRAIN_TRACKER_PROXY_URL") or None, trust_env=False)
+
+
 def _after_param(requested_time: str | None) -> str | None:
     """Converts a Gate 2-normalized "HH:MM" (assumed today, Melbourne
     local — see gate2's extraction prompt) into the UTC instant
@@ -67,7 +75,7 @@ async def find_next_service(stations: ResolvedStations, requested_time: str | No
     if after is not None:
         params["after"] = after
 
-    async with httpx.AsyncClient() as client:
+    async with _client() as client:
         response = await client.get(f"{_base_url()}/api/next-service", params=params)
 
     if response.status_code == 404:
