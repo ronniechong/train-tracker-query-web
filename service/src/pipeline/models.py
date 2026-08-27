@@ -11,6 +11,7 @@ class FallbackReason(StrEnum):
     UNKNOWN_STATION = "unknown_station"
     NO_SERVICE_TODAY = "no_service_today"
     NO_ROUTE_FOUND = "no_route_found"
+    SERVICE_UNAVAILABLE = "service_unavailable"
 
 
 class ExtractedQueryFields(BaseModel):

@@ -1,10 +1,14 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from groq import AsyncGroq
+import logging
+
+from groq import AsyncGroq, GroqError
 
 from . import tracing
 from .next_service import NextServiceResult
+
+_logger = logging.getLogger(__name__)
 
 _COMPOSITION_MODEL = "openai/gpt-oss-20b"
 _MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
@@ -87,14 +91,21 @@ def _fallback_answer(result: NextServiceResult) -> str:
 
 
 async def compose_answer(result: NextServiceResult, span=None) -> str:
-    response = await _get_client().chat.completions.create(
-        model=_COMPOSITION_MODEL,
-        temperature=0.3,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": _facts(result)},
-        ],
-    )
+    try:
+        response = await _get_client().chat.completions.create(
+            model=_COMPOSITION_MODEL,
+            temperature=0.3,
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": _facts(result)},
+            ],
+        )
+    except GroqError:
+        # A template-based fallback answer already exists for when the
+        # model's own output misbehaves (empty/over budget) - a request
+        # failure degrades the same way, rather than failing the query.
+        _logger.warning("Groq composition call failed, degrading to template answer")
+        return _fallback_answer(result)
     tracing.record_chat_cost(span, _COMPOSITION_MODEL, response)
     answer = (response.choices[0].message.content or "").strip()
     if not answer or len(answer) > _CHARACTER_BUDGET:

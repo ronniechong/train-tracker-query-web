@@ -1,4 +1,8 @@
+import pytest
+from groq import GroqError
+
 from src.pipeline import stt
+from src.pipeline.errors import UpstreamUnavailable
 
 
 class _FakeTranscription:
@@ -36,3 +40,24 @@ async def test_transcribe_sends_station_name_prompt(monkeypatch):
     call = client.audio.transcriptions.calls[0]
     assert call["prompt"] == stt._STATION_NAME_PROMPT
     assert len(stt._STATION_NAME_PROMPT) <= 896
+
+
+class _RaisingTranscriptions:
+    async def create(self, **kwargs):
+        raise GroqError("boom")
+
+
+class _RaisingAudio:
+    def __init__(self):
+        self.transcriptions = _RaisingTranscriptions()
+
+
+class _RaisingClient:
+    def __init__(self):
+        self.audio = _RaisingAudio()
+
+
+async def test_raises_upstream_unavailable_when_groq_request_fails(monkeypatch):
+    monkeypatch.setattr(stt, "_get_client", lambda: _RaisingClient())
+    with pytest.raises(UpstreamUnavailable):
+        await stt.transcribe(b"fake audio bytes")

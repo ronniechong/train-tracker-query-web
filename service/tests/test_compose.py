@@ -1,4 +1,5 @@
 import pytest
+from groq import GroqError
 
 from src.pipeline import compose
 from src.pipeline.next_service import Leg, NextServiceResult, StationRef
@@ -79,6 +80,29 @@ async def test_falls_back_when_llm_answer_empty(monkeypatch):
     _mock_client(monkeypatch, "")
     answer = await compose.compose_answer(_RESULT)
     assert len(answer) <= compose._CHARACTER_BUDGET
+    assert "Flinders Street Station" in answer
+
+
+class _RaisingCompletions:
+    async def create(self, **kwargs):
+        raise GroqError("boom")
+
+
+class _RaisingChat:
+    def __init__(self):
+        self.completions = _RaisingCompletions()
+
+
+class _RaisingClient:
+    def __init__(self):
+        self.chat = _RaisingChat()
+
+
+async def test_falls_back_to_template_when_groq_request_fails(monkeypatch):
+    monkeypatch.setattr(compose, "_get_client", lambda: _RaisingClient())
+    answer = await compose.compose_answer(_RESULT)
+    assert len(answer) <= compose._CHARACTER_BUDGET
+    assert "Richmond Station" in answer
     assert "Flinders Street Station" in answer
 
 

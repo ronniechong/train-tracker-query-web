@@ -1,6 +1,7 @@
-from groq import AsyncGroq
+from groq import AsyncGroq, GroqError
 
 from . import tracing
+from .errors import UpstreamUnavailable
 
 _client: AsyncGroq | None = None
 _MODEL = "whisper-large-v3-turbo"
@@ -31,10 +32,13 @@ def _get_client() -> AsyncGroq:
 
 
 async def transcribe(audio_bytes: bytes, span=None) -> str:
-    transcription = await _get_client().audio.transcriptions.create(
-        model=_MODEL,
-        file=("audio.webm", audio_bytes, "audio/webm"),
-        prompt=_STATION_NAME_PROMPT,
-    )
+    try:
+        transcription = await _get_client().audio.transcriptions.create(
+            model=_MODEL,
+            file=("audio.webm", audio_bytes, "audio/webm"),
+            prompt=_STATION_NAME_PROMPT,
+        )
+    except GroqError as exc:
+        raise UpstreamUnavailable("STT request failed") from exc
     tracing.record_cost(span, _MODEL, tracing.stt_cost_usd())
     return transcription.text
