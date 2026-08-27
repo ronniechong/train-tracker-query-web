@@ -32,3 +32,7 @@ class QueryResponse(BaseModel):
     audio: str | None = None
     fallback_reason: FallbackReason | None = None
     clarification: ClarificationInfo | None = None
+    # The originating Langfuse trace, so the frontend can attach
+    # thumbs-up/down feedback to the right trace. None when tracing isn't
+    # configured (Langfuse keys unset) - feedback is then a no-op.
+    trace_id: str | None = None

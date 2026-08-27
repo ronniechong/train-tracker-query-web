@@ -8,15 +8,19 @@ _PTV_JOURNEY_PLANNER_URL = "https://www.ptv.vic.gov.au/journey"
 
 
 async def run_pipeline(audio_bytes: bytes) -> QueryResponse:
-    with tracing.trace_query(len(audio_bytes)) as (trace_span, update_trace):
+    with tracing.trace_query(len(audio_bytes)) as (trace_span, update_trace, trace_id):
         with tracing.stage_span("stt") as span:
             transcript = await stt.transcribe(audio_bytes, span=span)
-        return await _run_pipeline_for_transcript(transcript, trace_span, update_trace)
+        response = await _run_pipeline_for_transcript(transcript, trace_span, update_trace)
+        response.trace_id = trace_id
+        return response
 
 
 async def run_pipeline_for_transcript(transcript: str) -> QueryResponse:
-    with tracing.trace_query(len(transcript)) as (trace_span, update_trace):
-        return await _run_pipeline_for_transcript(transcript, trace_span, update_trace)
+    with tracing.trace_query(len(transcript)) as (trace_span, update_trace, trace_id):
+        response = await _run_pipeline_for_transcript(transcript, trace_span, update_trace)
+        response.trace_id = trace_id
+        return response
 
 
 async def _run_pipeline_for_transcript(transcript: str, trace_span, update_trace) -> QueryResponse:
@@ -39,13 +43,15 @@ async def _run_pipeline_for_transcript(transcript: str, trace_span, update_trace
 
 
 async def run_pipeline_for_confirmed(extracted: ExtractedQuery) -> QueryResponse:
-    with tracing.trace_query(0) as (trace_span, update_trace):
+    with tracing.trace_query(0) as (trace_span, update_trace, trace_id):
         update_trace(input=tracing.safe_query_summary(extracted, 0))
         # Gate 1 already passed for the original query this extraction came
         # from (a clarification only ever follows a passed Gate 1) — this is
         # the user confirming a suggested station, not new untrusted text, so
         # re-running Gate 1 here would be redundant, not a safety gap.
-        return await _run_pipeline_for_extracted(extracted, trace_span, update_trace)
+        response = await _run_pipeline_for_extracted(extracted, trace_span, update_trace)
+        response.trace_id = trace_id
+        return response
 
 
 async def _run_pipeline_for_extracted(

@@ -58,3 +58,28 @@ def test_daily_spend_cap_triggers_after_enough_recorded_cost(monkeypatch):
 def test_tts_cost_usd_scales_with_character_count():
     assert tracing.tts_cost_usd(1_000_000) == pytest.approx(22.0)
     assert tracing.tts_cost_usd(0) == 0.0
+
+
+def test_record_feedback_is_noop_when_tracing_unconfigured(monkeypatch):
+    monkeypatch.setattr(tracing, "_get_client", lambda: None)
+    # Must not raise even with no real trace to attach to.
+    tracing.record_feedback("some-trace-id", True)
+
+
+def test_record_feedback_creates_boolean_score_on_the_trace(monkeypatch):
+    calls = []
+
+    class _FakeClient:
+        def create_score(self, **kwargs):
+            calls.append(kwargs)
+
+        def flush(self):
+            pass
+
+    monkeypatch.setattr(tracing, "_get_client", lambda: _FakeClient())
+    tracing.record_feedback("trace-123", False)
+
+    assert len(calls) == 1
+    assert calls[0]["trace_id"] == "trace-123"
+    assert calls[0]["value"] is False
+    assert calls[0]["data_type"] == "BOOLEAN"

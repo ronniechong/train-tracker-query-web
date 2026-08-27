@@ -24,7 +24,10 @@ interface QueryResponse {
   audio: string | null
   fallback_reason: string | null
   clarification: ClarificationInfo | null
+  trace_id: string | null
 }
+
+type FeedbackState = 'none' | 'sending' | 'up' | 'down'
 
 function playAudio(base64: string) {
   const audio = new Audio(`data:audio/wav;base64,${base64}`)
@@ -36,6 +39,7 @@ function App() {
   const [result, setResult] = useState<QueryResponse | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [textInput, setTextInput] = useState('')
+  const [feedback, setFeedback] = useState<FeedbackState>('none')
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -51,6 +55,7 @@ function App() {
       }
       const body: QueryResponse = await response.json()
       setResult(body)
+      setFeedback('none')
       setStage('result')
       if (body.audio) playAudio(body.audio)
     } catch (err) {
@@ -91,6 +96,20 @@ function App() {
     },
     [runQuery],
   )
+
+  const sendFeedback = useCallback(async (traceId: string, thumbsUp: boolean) => {
+    setFeedback('sending')
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trace_id: traceId, thumbs_up: thumbsUp }),
+      })
+      setFeedback(thumbsUp ? 'up' : 'down')
+    } catch {
+      setFeedback('none')
+    }
+  }, [])
 
   const stopRecording = useCallback(() => {
     if (stopTimerRef.current !== null) {
@@ -213,6 +232,33 @@ function App() {
                   {option}
                 </button>
               ))}
+            </div>
+          )}
+          {result.trace_id && (
+            <div className="feedback">
+              {feedback === 'none' || feedback === 'sending' ? (
+                <>
+                  <span>Was this helpful?</span>
+                  <button
+                    type="button"
+                    disabled={feedback === 'sending'}
+                    onClick={() => void sendFeedback(result.trace_id!, true)}
+                    aria-label="Thumbs up"
+                  >
+                    👍
+                  </button>
+                  <button
+                    type="button"
+                    disabled={feedback === 'sending'}
+                    onClick={() => void sendFeedback(result.trace_id!, false)}
+                    aria-label="Thumbs down"
+                  >
+                    👎
+                  </button>
+                </>
+              ) : (
+                <span>Thanks for the feedback.</span>
+              )}
             </div>
           )}
           <button type="button" onClick={reset}>

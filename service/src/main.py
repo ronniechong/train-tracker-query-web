@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
+from .pipeline import tracing
 from .pipeline.gate2 import ExtractedQuery
 from .pipeline.models import QueryResponse
 from .pipeline.orchestrator import run_pipeline, run_pipeline_for_confirmed, run_pipeline_for_transcript
@@ -64,3 +65,14 @@ async def query_confirm(body: ExtractedQuery) -> QueryResponse:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
     except ScheduleUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+class FeedbackRequest(BaseModel):
+    trace_id: str
+    thumbs_up: bool
+
+
+@app.post("/api/feedback")
+def feedback(body: FeedbackRequest) -> dict[str, str]:
+    tracing.record_feedback(body.trace_id, body.thumbs_up)
+    return {"status": "ok"}

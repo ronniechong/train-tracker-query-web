@@ -133,16 +133,30 @@ def safe_query_summary(extracted: "ExtractedQuery | None", transcript_length: in
 def trace_query(transcript_length: int):
     client = _get_client()
     if client is None:
-        yield None, lambda *a, **k: None
+        yield None, lambda *a, **k: None, None
         return
 
     with client.start_as_current_observation(
         as_type="span", name="voice-query", input={"transcript_length": transcript_length}
     ) as root_span:
         try:
-            yield root_span, root_span.update
+            yield root_span, root_span.update, root_span.trace_id
         finally:
             client.flush()
+
+
+def record_feedback(trace_id: str, thumbs_up: bool) -> None:
+    client = _get_client()
+    if client is None:
+        # Tracing isn't configured (Langfuse keys unset) - feedback has
+        # nothing to attach to. Same no-op pattern as the rest of this
+        # module rather than raising for a config state that's expected
+        # in local/test environments.
+        return
+    client.create_score(
+        name="user-feedback", value=thumbs_up, data_type="BOOLEAN", trace_id=trace_id
+    )
+    client.flush()
 
 
 @contextmanager
