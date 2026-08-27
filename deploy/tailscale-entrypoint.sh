@@ -9,8 +9,16 @@
 # first (a one-time, out-of-band step this script cannot perform).
 set -eu
 
+# -outbound-http-proxy-listen gives `service` (on the internal-only
+# `ingress` network, reachable here because `tailscale` shares Caddy's
+# netns, which is also on `ingress`) a route to train-tracker's
+# tailnet-only API. Bound to all interfaces in this shared namespace, not
+# just loopback, on purpose -- `service` connects to it as caddy:1055.
+# It's a tailscaled daemon flag, not a `tailscale set` option -- there is
+# no CLI equivalent to change this after the daemon has already started.
 tailscaled --state=/var/lib/tailscale/tailscaled.state \
-	--socket=/var/run/tailscale/tailscaled.sock &
+	--socket=/var/run/tailscale/tailscaled.sock \
+	--outbound-http-proxy-listen=:1055 &
 
 until tailscale status --json >/dev/null 2>&1; do
 	sleep 1
@@ -19,14 +27,5 @@ done
 tailscale up --authkey="${TS_AUTHKEY}" --hostname="${TS_HOSTNAME}" --accept-dns=false
 
 tailscale funnel --bg "${TARGET_PORT}"
-
-# Gives `service` (on the internal-only `ingress` network, reachable here
-# because `tailscale` shares Caddy's netns, which is also on `ingress`) a
-# route to train-tracker's tailnet-only API. Bound to all interfaces in
-# this shared namespace, not just loopback, on purpose -- `service`
-# connects to it as caddy:1055. Deliberately separate from Funnel above:
-# this proxy is never exposed publicly, only used outbound from inside
-# this host.
-tailscale set --outbound-http-proxy-listen=:1055
 
 wait
