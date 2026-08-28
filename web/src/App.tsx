@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import './App.css'
+import { API_BASE_URL } from './config'
 
 const MAX_RECORDING_MS = 30_000
 
@@ -66,7 +67,7 @@ function App() {
 
   const submitAudio = useCallback(
     (blob: Blob) =>
-      runQuery('/api/query', {
+      runQuery(`${API_BASE_URL}/api/query`, {
         method: 'POST',
         headers: { 'Content-Type': blob.type || 'audio/webm' },
         body: blob,
@@ -76,7 +77,7 @@ function App() {
 
   const submitText = useCallback(
     (text: string) =>
-      runQuery('/api/query/text', {
+      runQuery(`${API_BASE_URL}/api/query/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -88,7 +89,7 @@ function App() {
     (clarification: ClarificationInfo, stationName: string) => {
       const field = `${clarification.field}_station`
       const body = { ...clarification.extracted, [field]: stationName }
-      return runQuery('/api/query/confirm', {
+      return runQuery(`${API_BASE_URL}/api/query/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -100,7 +101,7 @@ function App() {
   const sendFeedback = useCallback(async (traceId: string, thumbsUp: boolean) => {
     setFeedback('sending')
     try {
-      await fetch('/api/feedback', {
+      await fetch(`${API_BASE_URL}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trace_id: traceId, thumbs_up: thumbsUp }),

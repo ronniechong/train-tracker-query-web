@@ -1,7 +1,7 @@
-# Sole ingress into this project's `service` (API) and `web` (static
-# frontend) containers. Listens on plain HTTP on an internal-only network —
-# TLS termination happens on the reverse-ingress layer in front of this
-# container, not here.
+# Sole ingress into this project's `service` (API) container -- the
+# frontend is a static site on GitHub Pages, not served from here. Listens
+# on plain HTTP on an internal-only network — TLS termination happens on
+# the reverse-ingress layer in front of this container, not here.
 {
 	auto_https off
 	admin off
@@ -29,17 +29,10 @@
 		-Server
 	}
 
-	@api path /api/* /health
-	handle @api {
-		# {http.request.remote.host} is Caddy's own trusted-proxy-resolved
-		# client IP, not a raw forwarded header — safe to pass through
-		# regardless of how X-Forwarded-For accumulates hops downstream.
-		reverse_proxy service:8000 {
-			header_up X-Real-IP {http.request.remote.host}
-		}
-	}
-
-	handle {
-		reverse_proxy web:80
+	# {http.request.remote.host} is Caddy's own trusted-proxy-resolved
+	# client IP, not a raw forwarded header — safe to pass through
+	# regardless of how X-Forwarded-For accumulates hops downstream.
+	reverse_proxy service:8000 {
+		header_up X-Real-IP {http.request.remote.host}
 	}
 }

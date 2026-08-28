@@ -1,5 +1,8 @@
+import os
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -31,11 +34,26 @@ def _client_ip(request: Request) -> str:
     return request.headers.get("X-Real-IP") or get_remote_address(request)
 
 
+def _cors_origins() -> list[str]:
+    raw = os.environ.get("CORS_ORIGINS", "")
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
 limiter = Limiter(key_func=_client_ip)
 
 app = FastAPI(title="train-tracker-query-web")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# The frontend now lives on GitHub Pages, a different origin from this API
+# (see deploy/Caddyfile) -- browser calls need this explicitly, an empty
+# CORS_ORIGINS means no browser origin can call this API at all, not "allow
+# everything".
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins(),
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 
 
 @app.get("/health")

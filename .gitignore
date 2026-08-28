@@ -3,6 +3,7 @@
 .env.*
 !deploy/.env.example
 !service/.env.example
+!web/.env.example
 CLAUDE.local.md
 docker-compose.override.yml
 

@@ -30,6 +30,8 @@ link to the PTV journey planner, never a guess.
 | Frontend | Vite + React (TypeScript), custom CSS (no framework) |
 | AI pipeline ownership | This repo owns the entire voice/AI pipeline end to end |
 | Scope boundary | Same-line + single-transfer only; no general multi-leg routing |
+| Backend hosting | Own Docker Compose + Tailscale Funnel stack, independent host from this repo |
+| Frontend hosting | GitHub Pages project site (`/train-tracker-query-web/` path), a different origin from the API — same split as train-tracker's own frontend/backend hosting |
 
 ## Security invariants (standing rules — a violation is never a refactor)
 

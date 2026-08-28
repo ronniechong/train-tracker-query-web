@@ -51,19 +51,6 @@ services:
     networks:
       - ingress
 
-  web:
-    build:
-      context: ../web
-    image: train-tracker-query-web-web:local
-    restart: unless-stopped
-    read_only: true
-    tmpfs:
-      - /tmp
-      - /var/cache/nginx
-      - /var/run
-    networks:
-      - ingress
-
   caddy:
     image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
     restart: unless-stopped
@@ -80,7 +67,6 @@ services:
       - public
     depends_on:
       - service
-      - web
 
   # Shares Caddy's network namespace so it reaches Caddy over localhost and
   # never gains any network membership beyond exactly what Caddy already
@@ -108,7 +94,7 @@ services:
 networks:
   # No real outbound route on this network at all — Docker gives it no
   # NAT, not just a firewall rule that could be misconfigured. `service`
-  # and `web` only ever accept inbound from `caddy`, and reach
+  # only ever accepts inbound from `caddy`, and reaches
   # `egress-proxy`/`caddy`'s proxy ports for anything outbound.
   ingress:
     internal: true
