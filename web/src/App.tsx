@@ -169,11 +169,6 @@ function App() {
   return (
     <main>
       <h1>Melbourne Train Times</h1>
-      <p className="disclosure">
-        Your voice recording is sent to Groq to transcribe your question and is
-        never stored. The text of your question is kept in our logs to help
-        improve answers.
-      </p>
 
       {stage === 'idle' && (
         <div className="idle-controls">
@@ -276,6 +271,8 @@ function App() {
           </button>
         </div>
       )}
+
+      <p className="fine-print">We do not store your voice recording.</p>
     </main>
   )
 }

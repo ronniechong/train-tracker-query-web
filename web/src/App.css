@@ -5,10 +5,10 @@ main {
   text-align: center;
 }
 
-.disclosure {
-  font-size: 0.85rem;
+.fine-print {
+  font-size: 0.75rem;
   color: #666;
-  margin-bottom: 2rem;
+  margin-top: 2.5rem;
 }
 
 button {
@@ -87,7 +87,7 @@ button:hover {
 }
 
 @media (prefers-color-scheme: dark) {
-  .disclosure {
+  .fine-print {
     color: #aaa;
   }
 
