@@ -160,4 +160,4 @@ async def _run_pipeline_for_extracted(
             audio = None
 
     update_trace(output={"text": answer})
-    return QueryResponse(text=answer, audio=audio)
+    return QueryResponse(text=answer, audio=audio, highlights=compose.build_highlights(result))

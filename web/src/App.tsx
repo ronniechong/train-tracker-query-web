@@ -1,34 +1,14 @@
 import { useCallback, useRef, useState } from 'react'
-import './App.css'
-import { API_BASE_URL } from './config'
+import { AnswerCard, type FeedbackState } from '@/components/AnswerCard'
+import { Button } from '@/components/ui/button'
+import { QueryForm, type QueryTab } from '@/components/QueryForm'
+import { API_BASE_URL } from '@/lib/api'
+import type { ClarificationInfo, QueryResponse } from '@/types'
 
 const MAX_RECORDING_MS = 30_000
+const TRAIN_TRACKER_URL = 'https://ronniechong.com/train-tracker/'
 
 type Stage = 'idle' | 'recording' | 'processing' | 'result' | 'error'
-
-interface ExtractedQueryFields {
-  from_station: string | null
-  to_station: string | null
-  route_hint: string | null
-  time: string | null
-}
-
-interface ClarificationInfo {
-  field: string
-  suggested_station_name: string | null
-  options: string[] | null
-  extracted: ExtractedQueryFields
-}
-
-interface QueryResponse {
-  text: string
-  audio: string | null
-  fallback_reason: string | null
-  clarification: ClarificationInfo | null
-  trace_id: string | null
-}
-
-type FeedbackState = 'none' | 'sending' | 'up' | 'down'
 
 function playAudio(base64: string) {
   const audio = new Audio(`data:audio/wav;base64,${base64}`)
@@ -36,6 +16,7 @@ function playAudio(base64: string) {
 }
 
 function App() {
+  const [activeTab, setActiveTab] = useState<QueryTab>('voice')
   const [stage, setStage] = useState<Stage>('idle')
   const [result, setResult] = useState<QueryResponse | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -167,113 +148,77 @@ function App() {
   }, [])
 
   return (
-    <main>
-      <h1>Melbourne Train Times</h1>
+    <div className="flex min-h-screen flex-col items-center bg-background px-6 py-10 text-foreground">
+      <div className="flex w-full max-w-lg flex-1 flex-col items-center">
+        <header className="mb-8 flex flex-col items-center gap-2">
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-10 w-10" />
+          <h1 className="text-center text-2xl font-semibold tracking-tight">
+            Ask Melbourne Train Tracker
+          </h1>
+        </header>
 
-      {stage === 'idle' && (
-        <div className="idle-controls">
-          <button type="button" onClick={() => void startRecording()}>
-            Ask a question
-          </button>
-          <form className="text-form" onSubmit={handleTextSubmit}>
-            <input
-              type="text"
-              placeholder="Or type your question…"
-              value={textInput}
-              onChange={(event) => setTextInput(event.target.value)}
+        <main className="w-full">
+          {stage === 'idle' && (
+            <QueryForm
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onStartRecording={() => void startRecording()}
+              textInput={textInput}
+              onTextInputChange={setTextInput}
+              onTextSubmit={handleTextSubmit}
             />
-            <button type="submit" disabled={!textInput.trim()}>
-              Ask
-            </button>
-          </form>
-        </div>
-      )}
+          )}
 
-      {stage === 'recording' && (
-        <div className="status status-recording">
-          <p>Listening… (stops automatically after 30 seconds)</p>
-          <button type="button" onClick={stopRecording}>
-            Stop
-          </button>
-        </div>
-      )}
+          {stage === 'recording' && (
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-destructive">Listening… (stops automatically after 30 seconds)</p>
+              <Button variant="outline" onClick={stopRecording}>
+                Stop
+              </Button>
+            </div>
+          )}
 
-      {stage === 'processing' && (
-        <div className="status status-processing">
-          <p>Working on your answer…</p>
-        </div>
-      )}
+          {stage === 'processing' && (
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-muted-foreground">Working on your answer…</p>
+            </div>
+          )}
 
-      {stage === 'result' && result && (
-        <div className={`status ${result.fallback_reason ? 'status-fallback' : 'status-answer'}`}>
-          <p>{result.text}</p>
-          {result.clarification?.suggested_station_name && (
-            <button
-              type="button"
-              onClick={() =>
-                void confirmSuggestion(result.clarification!, result.clarification!.suggested_station_name!)
+          {stage === 'result' && result && (
+            <AnswerCard
+              result={result}
+              feedback={feedback}
+              onConfirmSuggestion={(clarification, station) =>
+                void confirmSuggestion(clarification, station)
               }
-            >
-              Yes, use {result.clarification.suggested_station_name}
-            </button>
+              onSendFeedback={(traceId, thumbsUp) => void sendFeedback(traceId, thumbsUp)}
+              onReset={reset}
+            />
           )}
-          {result.clarification?.options && (
-            <div className="clarification-options">
-              {result.clarification.options.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => void confirmSuggestion(result.clarification!, option)}
-                >
-                  {option}
-                </button>
-              ))}
+
+          {stage === 'error' && (
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-muted-foreground">{errorMessage}</p>
+              <Button variant="outline" onClick={reset}>
+                Try again
+              </Button>
             </div>
           )}
-          {result.trace_id && (
-            <div className="feedback">
-              {feedback === 'none' || feedback === 'sending' ? (
-                <>
-                  <span>Was this helpful?</span>
-                  <button
-                    type="button"
-                    disabled={feedback === 'sending'}
-                    onClick={() => void sendFeedback(result.trace_id!, true)}
-                    aria-label="Thumbs up"
-                  >
-                    👍
-                  </button>
-                  <button
-                    type="button"
-                    disabled={feedback === 'sending'}
-                    onClick={() => void sendFeedback(result.trace_id!, false)}
-                    aria-label="Thumbs down"
-                  >
-                    👎
-                  </button>
-                </>
-              ) : (
-                <span>Thanks for the feedback.</span>
-              )}
-            </div>
-          )}
-          <button type="button" onClick={reset}>
-            Ask another question
-          </button>
-        </div>
-      )}
+        </main>
+      </div>
 
-      {stage === 'error' && (
-        <div className="status status-fallback">
-          <p>{errorMessage}</p>
-          <button type="button" onClick={reset}>
-            Try again
-          </button>
-        </div>
-      )}
-
-      <p className="fine-print">We do not store your voice recording.</p>
-    </main>
+      <footer className="mt-10 max-w-lg text-center text-xs text-muted-foreground">
+        <p>We do not store your voice recording.</p>
+        <p className="mt-1">
+          This is an experimental project and should not be relied on for real train times. For trip
+          planning, use the{' '}
+          <a href={TRAIN_TRACKER_URL} className="underline underline-offset-2">
+            Train Tracker
+          </a>{' '}
+          website.
+        </p>
+      </footer>
+    </div>
   )
 }
 

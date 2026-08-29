@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -28,11 +29,23 @@ class ClarificationInfo(BaseModel):
     extracted: ExtractedQueryFields  # the original query, to resubmit with a substitution
 
 
+class Highlight(BaseModel):
+    # The exact substring to find in `text` — compose.py builds these with
+    # the same deterministic formatting the composition prompt requires
+    # the model to use verbatim (station names, times, platforms), so a
+    # plain substring match against the composed sentence works. A
+    # highlight that doesn't appear (the model phrased around it) is
+    # simply not found — the frontend skips it silently, never an error.
+    text: str
+    kind: Literal["station", "platform", "time"]
+
+
 class QueryResponse(BaseModel):
     text: str
     audio: str | None = None
     fallback_reason: FallbackReason | None = None
     clarification: ClarificationInfo | None = None
+    highlights: list[Highlight] = []
     # The originating Langfuse trace, so the frontend can attach
     # thumbs-up/down feedback to the right trace. None when tracing isn't
     # configured (Langfuse keys unset) - feedback is then a no-op.

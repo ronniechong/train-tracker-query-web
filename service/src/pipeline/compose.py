@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 import logging
@@ -6,6 +7,7 @@ import logging
 from groq import AsyncGroq, GroqError
 
 from . import tracing
+from .models import Highlight
 from .next_service import NextServiceResult
 
 _logger = logging.getLogger(__name__)
@@ -88,6 +90,32 @@ def _fallback_answer(result: NextServiceResult) -> str:
         f"{_local_time(leg.arrival_time)}."
     )
     return answer[:_CHARACTER_BUDGET]
+
+
+def build_highlights(result: NextServiceResult) -> list[Highlight]:
+    # Same formatting as _facts()/_fallback_answer() above, which the
+    # composition prompt requires the model to reproduce verbatim -- built
+    # from the deterministic Leg data, never from the model's own output.
+    highlights: list[Highlight] = []
+    seen: set[tuple[str, str]] = set()
+
+    def _add(text: str, kind: Literal["station", "platform", "time"]) -> None:
+        key = (kind, text)
+        if key in seen:
+            return
+        seen.add(key)
+        highlights.append(Highlight(text=text, kind=kind))
+
+    for i, leg in enumerate(result.legs, start=1):
+        is_final_leg = i == len(result.legs)
+        _add(_station_name(leg.from_station.name), "station")
+        _add(_station_name(leg.to_station.name), "station")
+        _add(_local_time(leg.departure_time), "time")
+        if leg.from_platform_code:
+            _add(f"Platform {leg.from_platform_code}", "platform")
+        if is_final_leg:
+            _add(_local_time(leg.arrival_time), "time")
+    return highlights
 
 
 async def compose_answer(result: NextServiceResult, span=None) -> str:

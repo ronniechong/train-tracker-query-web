@@ -88,6 +88,56 @@ def test_query_returns_composed_answer_and_audio_on_success():
     assert body["fallback_reason"] is None
 
 
+def test_query_returns_highlights_built_from_real_leg_data():
+    from src.main import limiter
+    from src.pipeline.next_service import Leg
+
+    limiter.reset()
+    success_result = NextServiceResult(
+        from_station=_FROM_REF,
+        to_station=_TO_REF,
+        generated_at="2026-08-26T08:00:00Z",
+        reason=None,
+        legs=[
+            Leg(
+                trip_id="t1",
+                route_id="r1",
+                headsign="Test",
+                from_station=_FROM_REF,
+                from_platform_code="3",
+                departure_time="2026-08-26T03:08:00Z",
+                to_station=_TO_REF,
+                arrival_time="2026-08-26T03:21:00Z",
+            )
+        ],
+    )
+    p1, p2, p3 = _patched_up_to_gate2()
+    with (
+        p1,
+        p2,
+        p3,
+        patch(
+            "src.pipeline.orchestrator.next_service.find_next_service",
+            new=AsyncMock(return_value=success_result),
+        ),
+        patch(
+            "src.pipeline.orchestrator.compose.compose_answer",
+            new=AsyncMock(return_value="Next train departs shortly."),
+        ),
+        patch(
+            "src.pipeline.orchestrator.tts.synthesize",
+            new=AsyncMock(return_value=None),
+        ),
+    ):
+        response = client.post("/api/query", content=b"short audio")
+    limiter.reset()
+    assert response.status_code == 200
+    highlights = response.json()["highlights"]
+    kinds_and_texts = {(h["kind"], h["text"]) for h in highlights}
+    assert ("station", "Richmond Railway Station".replace(" Railway", "")) in kinds_and_texts
+    assert ("platform", "Platform 3") in kinds_and_texts
+
+
 def test_query_returns_fallback_for_no_service_today():
     reason_result = NextServiceResult(
         from_station=_FROM_REF,

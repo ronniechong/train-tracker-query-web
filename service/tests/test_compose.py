@@ -172,3 +172,61 @@ def test_fallback_answer_uses_station_not_railway_station():
     assert "Railway Station" not in answer
     assert "Richmond Station" in answer
     assert "Flinders Street Station" in answer
+
+
+def test_build_highlights_includes_stations_and_times():
+    highlights = compose.build_highlights(_RESULT)
+    texts_by_kind = {(h.kind, h.text) for h in highlights}
+    assert ("station", "Richmond Station") in texts_by_kind
+    assert ("station", "Flinders Street Station") in texts_by_kind
+    assert ("time", compose._local_time(_RESULT.legs[0].departure_time)) in texts_by_kind
+    assert ("time", compose._local_time(_RESULT.legs[0].arrival_time)) in texts_by_kind
+
+
+def test_build_highlights_includes_platform_when_present():
+    result = _RESULT.model_copy(deep=True)
+    result.legs[0].from_platform_code = "8"
+    highlights = compose.build_highlights(result)
+    assert ("platform", "Platform 8") in {(h.kind, h.text) for h in highlights}
+
+
+def test_build_highlights_omits_platform_when_absent():
+    highlights = compose.build_highlights(_RESULT)
+    assert not any(h.kind == "platform" for h in highlights)
+
+
+def test_build_highlights_dedupes_repeated_station_across_legs():
+    two_leg_result = _RESULT.model_copy(deep=True)
+    interchange = StationRef(station_id="interchange", name="Southern Cross Railway Station")
+    second_leg = Leg(
+        trip_id="t2",
+        route_id="r2",
+        headsign="Test",
+        from_station=interchange,
+        departure_time="2026-08-26T03:30:00Z",
+        to_station=_FLINDERS,
+        arrival_time="2026-08-26T03:45:00Z",
+    )
+    two_leg_result.legs.append(second_leg)
+    highlights = compose.build_highlights(two_leg_result)
+    flinders_count = sum(1 for h in highlights if h.kind == "station" and h.text == "Flinders Street Station")
+    assert flinders_count == 1
+
+
+def test_build_highlights_only_final_leg_arrival_time():
+    two_leg_result = _RESULT.model_copy(deep=True)
+    interchange = StationRef(station_id="interchange", name="Southern Cross Railway Station")
+    second_leg = Leg(
+        trip_id="t2",
+        route_id="r2",
+        headsign="Test",
+        from_station=interchange,
+        departure_time="2026-08-26T03:30:00Z",
+        to_station=_FLINDERS,
+        arrival_time="2026-08-26T03:45:00Z",
+    )
+    two_leg_result.legs.append(second_leg)
+    highlights = compose.build_highlights(two_leg_result)
+    times = {h.text for h in highlights if h.kind == "time"}
+    assert compose._local_time(two_leg_result.legs[0].arrival_time) not in times
+    assert compose._local_time(two_leg_result.legs[1].arrival_time) in times

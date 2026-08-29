@@ -27,7 +27,7 @@ link to the PTV journey planner, never a guess.
 | Decision | Choice |
 |---|---|
 | Backend | Python 3.12, FastAPI, `uv` |
-| Frontend | Vite + React (TypeScript), custom CSS (no framework) |
+| Frontend | Vite + React (TypeScript), Tailwind v4 + shadcn/ui (base-ui primitives) |
 | AI pipeline ownership | This repo owns the entire voice/AI pipeline end to end |
 | Scope boundary | Same-line + single-transfer only; no general multi-leg routing |
 | Backend hosting | Own Docker Compose + Tailscale Funnel stack, independent host from this repo |
